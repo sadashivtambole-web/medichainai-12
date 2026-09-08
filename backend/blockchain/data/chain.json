@@ -1,0 +1,2255 @@
+[
+  {
+    "index": 0,
+    "timestamp": "2024-01-01T00:00:00.000Z",
+    "transactions": [
+      {
+        "transactionId": "tx-genesis-0000000000000000",
+        "type": "MEDICINE_REGISTERED",
+        "medicineId": "GENESIS-DRUGCHAIN-ROOT",
+        "batchNumber": "GENESIS-BATCH-000",
+        "from": null,
+        "to": "DrugChain Network Authority",
+        "timestamp": "2024-01-01T00:00:00.000Z",
+        "dataHash": "3e8d1d5dbe42a78891fbee062048e806d8d142563f08f620929e89bd845ebacf",
+        "metadata": {
+          "network": "DrugChain Private Permissioned Network",
+          "consensus": "Proof of Authority (PoA)",
+          "purpose": "Immutable Pharmaceutical Traceability & Anti-Counterfeit Ledger"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "hash": "ebb09faaccac2dd81ee3dd2f2e84bc4a8e1256376a24b2fba9363e103113c6a5",
+    "merkleRoot": "4b1e4c667556b8006795add77bbc658042405ee2bedfe246f710cf86699a255d",
+    "validator": "genesis-authority"
+  },
+  {
+    "index": 1,
+    "timestamp": "2026-08-17T03:52:36.785Z",
+    "transactions": [
+      {
+        "transactionId": "tx-ebabd783aeac1c03-mswp754h",
+        "type": "MEDICINE_TRANSFERRED",
+        "medicineId": "TR-732506",
+        "batchNumber": "TR-732506",
+        "from": "xyz",
+        "to": "ABC Distributors",
+        "timestamp": "2026-08-17T03:52:36.785Z",
+        "dataHash": "e515056e936de8919d5f7af3a4f709158dc7f110128759578b6cdac0cfe7c8d5",
+        "metadata": {
+          "fromRole": "Manufacturer",
+          "toRole": "Distributor",
+          "action": "TRANSFER_DISPATCHED"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "ebb09faaccac2dd81ee3dd2f2e84bc4a8e1256376a24b2fba9363e103113c6a5",
+    "hash": "52ab82083b6f85a4eb9f98ea84887d116c2cc25c8f10ad0375c007f7ed17acea",
+    "merkleRoot": "f9b185c50c4f93803b337fbd44d8de2b3ede7568a8fa49f4ca22b3197956310e",
+    "validator": "validator-distributor"
+  },
+  {
+    "index": 2,
+    "timestamp": "2026-08-17T03:52:58.223Z",
+    "transactions": [
+      {
+        "transactionId": "tx-4bec4f1d9c2c3f02-mswp7lnz",
+        "type": "MEDICINE_TRANSFERRED",
+        "medicineId": "MED-2024-006",
+        "batchNumber": "MED-2024-006",
+        "from": "Transit",
+        "to": "City Pharmacy POS",
+        "timestamp": "2026-08-17T03:52:58.223Z",
+        "dataHash": "366ae5a8f1e1a905204a0b8deaacb92307e566add9066fd132764259bc9fe076",
+        "metadata": {
+          "fromRole": "Distributor",
+          "toRole": "Pharmacy",
+          "action": "TRANSFER_DISPATCHED"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "52ab82083b6f85a4eb9f98ea84887d116c2cc25c8f10ad0375c007f7ed17acea",
+    "hash": "f94a622ee3c928338de40258514782b2b5fd91e5c25df4921ed3f2849ae34029",
+    "merkleRoot": "02ac86d8212135e3d0bb99074bdd8e02cc5aed08bc9ebcec8e6bbb74db9fa371",
+    "validator": "validator-pharmacy"
+  },
+  {
+    "index": 3,
+    "timestamp": "2026-08-17T05:17:10.443Z",
+    "transactions": [
+      {
+        "transactionId": "tx-79c5be97ba779354-msws7vze",
+        "type": "MEDICINE_REGISTERED",
+        "medicineId": "MED-2024-008",
+        "batchNumber": "BT-AUDIT-0383",
+        "from": null,
+        "to": "Sun Pharma Laboratories",
+        "timestamp": "2026-08-17T05:17:10.442Z",
+        "dataHash": "a55331461c09c156d6341640c315468c34932578d6a691c9aee2bd44107ad9f8",
+        "metadata": {
+          "medicineName": "Amoxicillin 250mg",
+          "manufacturerCode": "MFR-SUN-772",
+          "manufacturerName": "Sun Pharma Laboratories",
+          "manufacturingDate": "2024-01-01",
+          "expiryDate": "2026-01-01",
+          "role": "Manufacturer"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "f94a622ee3c928338de40258514782b2b5fd91e5c25df4921ed3f2849ae34029",
+    "hash": "2ac5bdac317e8bf49f7dd7d98b91a0b074692e4b8f8533b11fed77d3a6a01f22",
+    "merkleRoot": "2b3c37611667731fb984844c85555f66fa1534eb6a51fd2ed7f71b6e8be4a0b6",
+    "validator": "validator-manufacturer"
+  },
+  {
+    "index": 4,
+    "timestamp": "2026-08-17T05:17:10.565Z",
+    "transactions": [
+      {
+        "transactionId": "tx-203557e571e02f50-msws7w2t",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-008",
+        "batchNumber": "BT-AUDIT-0383",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:17:10.564Z",
+        "dataHash": "a3c82afb39dd9e72ad5ca77d4f4cb68a9402bc23bbf8e418bfdaac6377d4f684",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MISMATCH",
+          "match": false,
+          "submittedHash": "a46827a976255b96e69d815ee64d8cda5be94475a79f4beb5f07ccb766c7e702",
+          "registeredHash": "a55331461c09c156d6341640c315468c34932578d6a691c9aee2bd44107ad9f8"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "2ac5bdac317e8bf49f7dd7d98b91a0b074692e4b8f8533b11fed77d3a6a01f22",
+    "hash": "5d9c985392dbd3e25790232037df99cdb87627f9f2d4367595f9ca42c7716ca5",
+    "merkleRoot": "ae40b5394b451bb4607932b2d8ed3cd552604cd88cbb3e59e2c94cd5a90dd776",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 5,
+    "timestamp": "2026-08-17T05:17:10.606Z",
+    "transactions": [
+      {
+        "transactionId": "tx-6f05fd87da6de934-msws7w3y",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-008",
+        "batchNumber": "BT-AUDIT-0383",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:17:10.606Z",
+        "dataHash": "b2ccd5afc98eb46591f932934ccadad12370b18d3944fd7875a07b975d1e3b8c",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MISMATCH",
+          "match": false,
+          "submittedHash": "a46827a976255b96e69d815ee64d8cda5be94475a79f4beb5f07ccb766c7e702",
+          "registeredHash": "a55331461c09c156d6341640c315468c34932578d6a691c9aee2bd44107ad9f8"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "5d9c985392dbd3e25790232037df99cdb87627f9f2d4367595f9ca42c7716ca5",
+    "hash": "097d8cadd8cad43dbfb5ad7ef4e1715a15dd0560f73d282952c93f59e5272234",
+    "merkleRoot": "a0f8f6f64b0575bf2cce4dfa1e13834607237781f7d848e7512137a60b58b7c4",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 6,
+    "timestamp": "2026-08-17T05:17:10.643Z",
+    "transactions": [
+      {
+        "transactionId": "tx-ac87f6e18232078c-msws7w4z",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-008",
+        "batchNumber": "BT-AUDIT-0383",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:17:10.643Z",
+        "dataHash": "3572b7015fc50068f11478096b52f3da83a31093a0c5f5c9a830be8aad8c04ee",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MISMATCH",
+          "match": false,
+          "submittedHash": "a46827a976255b96e69d815ee64d8cda5be94475a79f4beb5f07ccb766c7e702",
+          "registeredHash": "a55331461c09c156d6341640c315468c34932578d6a691c9aee2bd44107ad9f8"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "097d8cadd8cad43dbfb5ad7ef4e1715a15dd0560f73d282952c93f59e5272234",
+    "hash": "f4fcb8a1c4f4d49920318619bff3b14bb81e3789d7559399d8afc58e6d846058",
+    "merkleRoot": "169162e410d5ba0d930e4c833bdd941e3599aef3da31bca42ee153bd920f7358",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 7,
+    "timestamp": "2026-08-17T05:17:10.676Z",
+    "transactions": [
+      {
+        "transactionId": "tx-afaccf53011aac1f-msws7w5w",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-008",
+        "batchNumber": "BT-AUDIT-0383",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:17:10.676Z",
+        "dataHash": "3665d04ecc731d32814fa2e2cbbb32dd3e386cfd1467f84665b8ccdfbd279d15",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MISMATCH",
+          "match": false,
+          "submittedHash": "a46827a976255b96e69d815ee64d8cda5be94475a79f4beb5f07ccb766c7e702",
+          "registeredHash": "a55331461c09c156d6341640c315468c34932578d6a691c9aee2bd44107ad9f8"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "f4fcb8a1c4f4d49920318619bff3b14bb81e3789d7559399d8afc58e6d846058",
+    "hash": "4617858a25d15da4944e72e5823ba59f3fc5f9668a6fc79cdaa73b1f72c4ce37",
+    "merkleRoot": "4cf690091ac5acacb3d59825cb97a739b917093e04cb251ba77c056efac1cbe5",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 8,
+    "timestamp": "2026-08-17T05:17:10.713Z",
+    "transactions": [
+      {
+        "transactionId": "tx-aee4f0480fa4c392-msws7w6x",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-008",
+        "batchNumber": "BT-AUDIT-0383",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:17:10.712Z",
+        "dataHash": "2ebd358bbcfe9203a43882b098f2eda6e083e465d2300d791f20128eb4abfe60",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MISMATCH",
+          "match": false,
+          "submittedHash": "a46827a976255b96e69d815ee64d8cda5be94475a79f4beb5f07ccb766c7e702",
+          "registeredHash": "a55331461c09c156d6341640c315468c34932578d6a691c9aee2bd44107ad9f8"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "4617858a25d15da4944e72e5823ba59f3fc5f9668a6fc79cdaa73b1f72c4ce37",
+    "hash": "978ff9af210daa8a291523e93e277dd5efbf2990d4d2973f1aa64a06f41ce003",
+    "merkleRoot": "11e06586ba8ca09d47ee08e9ca6095ce691c82f94a4c209c5bd2d3a3222920f9",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 9,
+    "timestamp": "2026-08-17T05:17:10.744Z",
+    "transactions": [
+      {
+        "transactionId": "tx-74ee44385f7f7dbd-msws7w7s",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-008",
+        "batchNumber": "BT-AUDIT-0383",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:17:10.744Z",
+        "dataHash": "758f708d61d780c5f45295a3ee18a3768d8b533b2ad110ec73e3896d5e6894e7",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MISMATCH",
+          "match": false,
+          "submittedHash": "a46827a976255b96e69d815ee64d8cda5be94475a79f4beb5f07ccb766c7e702",
+          "registeredHash": "a55331461c09c156d6341640c315468c34932578d6a691c9aee2bd44107ad9f8"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "978ff9af210daa8a291523e93e277dd5efbf2990d4d2973f1aa64a06f41ce003",
+    "hash": "9f86463e60fc76d51c2e335c0c091291e6f42c37b349a5a372837a56c66a35b9",
+    "merkleRoot": "35e44f2511e377d24ff7cb7e15300cc652cf09c034545a19fb6cf309adc44d14",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 10,
+    "timestamp": "2026-08-17T05:17:10.779Z",
+    "transactions": [
+      {
+        "transactionId": "tx-a28964a41e4d6a80-msws7w8r",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-008",
+        "batchNumber": "BT-AUDIT-0383",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:17:10.779Z",
+        "dataHash": "b1e48fe71bd38e522a20c03c29a58c2f0b57a528a19405c1c72d0563bced67bc",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MISMATCH",
+          "match": false,
+          "submittedHash": "a46827a976255b96e69d815ee64d8cda5be94475a79f4beb5f07ccb766c7e702",
+          "registeredHash": "a55331461c09c156d6341640c315468c34932578d6a691c9aee2bd44107ad9f8"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "9f86463e60fc76d51c2e335c0c091291e6f42c37b349a5a372837a56c66a35b9",
+    "hash": "6d414c80173797ea11faac90985e4b4b45d77f9f8166449c3ff03322aca4c525",
+    "merkleRoot": "e6080f8494117bd470b68b4439d62a1b06c76a04661d138fdab0345de89a1b15",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 11,
+    "timestamp": "2026-08-17T05:17:10.811Z",
+    "transactions": [
+      {
+        "transactionId": "tx-17e619d98fca9b71-msws7w9n",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-008",
+        "batchNumber": "BT-AUDIT-0383",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:17:10.811Z",
+        "dataHash": "5c35e44e1250cd58261c84e088bb3b9d714c2cec474d52d188c5e0a6caeb8e71",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MISMATCH",
+          "match": false,
+          "submittedHash": "a46827a976255b96e69d815ee64d8cda5be94475a79f4beb5f07ccb766c7e702",
+          "registeredHash": "a55331461c09c156d6341640c315468c34932578d6a691c9aee2bd44107ad9f8"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "6d414c80173797ea11faac90985e4b4b45d77f9f8166449c3ff03322aca4c525",
+    "hash": "1e8e44dc6e0720a897aca40cd02361e12c3d97c12789868673e9285325279488",
+    "merkleRoot": "6e5b901630c48743a0b1e7fa1edb45a690e666d42a783b9c060b9b1f9fc8e1c7",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 12,
+    "timestamp": "2026-08-17T05:17:10.842Z",
+    "transactions": [
+      {
+        "transactionId": "tx-3a250803159a3daa-msws7wai",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-008",
+        "batchNumber": "BT-AUDIT-0383",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:17:10.842Z",
+        "dataHash": "b815c86f1a8ca65811a342444d75ae7aaae77fff15e85ddac731a80415b664a4",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MISMATCH",
+          "match": false,
+          "submittedHash": "a46827a976255b96e69d815ee64d8cda5be94475a79f4beb5f07ccb766c7e702",
+          "registeredHash": "a55331461c09c156d6341640c315468c34932578d6a691c9aee2bd44107ad9f8"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "1e8e44dc6e0720a897aca40cd02361e12c3d97c12789868673e9285325279488",
+    "hash": "62498e7c76ee611ceaf4c49e7b4949ac50e2650b8d7e40fc65ff8cd91ccd468d",
+    "merkleRoot": "ddda6a1101edcc4d4cfb7ba39ce4c76b7cc3fe4bcae7096abe89a87297764907",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 13,
+    "timestamp": "2026-08-17T05:17:56.303Z",
+    "transactions": [
+      {
+        "transactionId": "tx-bead3264afee1fc5-msws8vda",
+        "type": "MEDICINE_REGISTERED",
+        "medicineId": "MED-2024-009",
+        "batchNumber": "BT-AUDIT-6251",
+        "from": null,
+        "to": "Sun Pharma Laboratories",
+        "timestamp": "2026-08-17T05:17:56.302Z",
+        "dataHash": "74a3ce5330ca1271fcda4ef7d4a5777bd498bcdf2ac19a5a5bf8cba24ad54446",
+        "metadata": {
+          "medicineName": "Amoxicillin 250mg",
+          "manufacturerCode": "MFR-SUN-772",
+          "manufacturerName": "Sun Pharma Laboratories",
+          "manufacturingDate": "2024-01-01",
+          "expiryDate": "2026-01-01",
+          "role": "Manufacturer"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "62498e7c76ee611ceaf4c49e7b4949ac50e2650b8d7e40fc65ff8cd91ccd468d",
+    "hash": "9020874a81002d79bd773904cd471f9abfcf71045802a579fef00510d9e738e3",
+    "merkleRoot": "6d2043a257e05d847b55045a7efd8bfeb5641006689c263f100539456ec16755",
+    "validator": "validator-manufacturer"
+  },
+  {
+    "index": 14,
+    "timestamp": "2026-08-17T05:17:56.435Z",
+    "transactions": [
+      {
+        "transactionId": "tx-150f5ec015f25282-msws8vgz",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-009",
+        "batchNumber": "BT-AUDIT-6251",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:17:56.435Z",
+        "dataHash": "fccb225e439ab62e7b65f1af6b3ad3b6443b6bb5edac9bd371a3dd061e23d7d6",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MISMATCH",
+          "match": false,
+          "submittedHash": "8513df32ef44dafeb0246ff9a128cf3b55ddbca63a553c2ef352b90fedfc9695",
+          "registeredHash": "74a3ce5330ca1271fcda4ef7d4a5777bd498bcdf2ac19a5a5bf8cba24ad54446"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "9020874a81002d79bd773904cd471f9abfcf71045802a579fef00510d9e738e3",
+    "hash": "644f2bbbd8c98cd19e76f30fd26f8fc22097ced25516960f2dcdd8932275a891",
+    "merkleRoot": "343468b003cd4dbaddac89ae735d14fc7f61b24d33f0e97ec29c2eb4c04ff375",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 15,
+    "timestamp": "2026-08-17T05:17:56.480Z",
+    "transactions": [
+      {
+        "transactionId": "tx-2fc14f5190ebcf75-msws8vi8",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-009",
+        "batchNumber": "BT-AUDIT-6251",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:17:56.480Z",
+        "dataHash": "a35ff195c3529e4a5d9a0b31ef1bf8275de9dcc311135d217b20771c3f780ced",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MISMATCH",
+          "match": false,
+          "submittedHash": "8513df32ef44dafeb0246ff9a128cf3b55ddbca63a553c2ef352b90fedfc9695",
+          "registeredHash": "74a3ce5330ca1271fcda4ef7d4a5777bd498bcdf2ac19a5a5bf8cba24ad54446"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "644f2bbbd8c98cd19e76f30fd26f8fc22097ced25516960f2dcdd8932275a891",
+    "hash": "8ebf15a8022eddc4177aef0c97f4f9fb5889bd4f758cf8762c27c637c27a3f74",
+    "merkleRoot": "ce6530330d4f5639bbb1555f755081d31416c9c48f20b51b8e15575e2d936a35",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 16,
+    "timestamp": "2026-08-17T05:17:56.519Z",
+    "transactions": [
+      {
+        "transactionId": "tx-ed38ebf972b5c644-msws8vjb",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-009",
+        "batchNumber": "BT-AUDIT-6251",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:17:56.519Z",
+        "dataHash": "b875f861281754f596adbb1850f30d700ad01e518bd9e1040f9bfcabb8e9df5c",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MISMATCH",
+          "match": false,
+          "submittedHash": "8513df32ef44dafeb0246ff9a128cf3b55ddbca63a553c2ef352b90fedfc9695",
+          "registeredHash": "74a3ce5330ca1271fcda4ef7d4a5777bd498bcdf2ac19a5a5bf8cba24ad54446"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "8ebf15a8022eddc4177aef0c97f4f9fb5889bd4f758cf8762c27c637c27a3f74",
+    "hash": "2052eda5ace6a8c281ec4dc65d43b4cd8b2a297280245df1ee4eb6f551511e28",
+    "merkleRoot": "11da23b8d3534761f6bb1af369065b71aa293cd17b61dd823b7dab48f9b888e4",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 17,
+    "timestamp": "2026-08-17T05:17:56.557Z",
+    "transactions": [
+      {
+        "transactionId": "tx-e6f543abde0a3c78-msws8vkd",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-009",
+        "batchNumber": "BT-AUDIT-6251",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:17:56.557Z",
+        "dataHash": "04743f1a8bac91eb58d22538dc8f44e2cd9c0cbbcc4b5c18c5befdfb0239b466",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MISMATCH",
+          "match": false,
+          "submittedHash": "8513df32ef44dafeb0246ff9a128cf3b55ddbca63a553c2ef352b90fedfc9695",
+          "registeredHash": "74a3ce5330ca1271fcda4ef7d4a5777bd498bcdf2ac19a5a5bf8cba24ad54446"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "2052eda5ace6a8c281ec4dc65d43b4cd8b2a297280245df1ee4eb6f551511e28",
+    "hash": "c470beeab60e731e48a5737ea28399270d23ccb70334692d0e9e9996bb86b19a",
+    "merkleRoot": "872495d93251c5c81dd3aa0708568049249bc41aa29fab659f4336ce610cb5ae",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 18,
+    "timestamp": "2026-08-17T05:17:56.600Z",
+    "transactions": [
+      {
+        "transactionId": "tx-7b5347aecce4d38a-msws8vlk",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-009",
+        "batchNumber": "BT-AUDIT-6251",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:17:56.600Z",
+        "dataHash": "a6b39e66e24b42b511c0221455858d1487ed85693f69e99dc059262676fe1661",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MISMATCH",
+          "match": false,
+          "submittedHash": "8513df32ef44dafeb0246ff9a128cf3b55ddbca63a553c2ef352b90fedfc9695",
+          "registeredHash": "74a3ce5330ca1271fcda4ef7d4a5777bd498bcdf2ac19a5a5bf8cba24ad54446"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "c470beeab60e731e48a5737ea28399270d23ccb70334692d0e9e9996bb86b19a",
+    "hash": "292f549cfa63e3177d41ef6fbb242064529be4305f12c85b9d2c8f4d469409d6",
+    "merkleRoot": "2c2d3b02f54c7e60902e2a692876b32e107aaa833a1a4bb10d360dd1929c153a",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 19,
+    "timestamp": "2026-08-17T05:17:56.634Z",
+    "transactions": [
+      {
+        "transactionId": "tx-0dd8d3e6f402c845-msws8vmi",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-009",
+        "batchNumber": "BT-AUDIT-6251",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:17:56.633Z",
+        "dataHash": "7fa5434d8c76920c10cdff1331d283b0d4e4b9884e7f2dee3b60f6f43a2f971c",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MISMATCH",
+          "match": false,
+          "submittedHash": "8513df32ef44dafeb0246ff9a128cf3b55ddbca63a553c2ef352b90fedfc9695",
+          "registeredHash": "74a3ce5330ca1271fcda4ef7d4a5777bd498bcdf2ac19a5a5bf8cba24ad54446"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "292f549cfa63e3177d41ef6fbb242064529be4305f12c85b9d2c8f4d469409d6",
+    "hash": "9c441679a200f6649f9616e9f192e75c3075fb0d4bf51ac7f8f5d1d44e45d03c",
+    "merkleRoot": "c160123cd76163c0694df96cb1fd118c6466e1ce0d8eb6b9eaf5d899a3931333",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 20,
+    "timestamp": "2026-08-17T05:17:56.669Z",
+    "transactions": [
+      {
+        "transactionId": "tx-778464f938eca06b-msws8vnh",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-009",
+        "batchNumber": "BT-AUDIT-6251",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:17:56.669Z",
+        "dataHash": "f4472f9508a1f4ff8b3f298e47af08802666bcef7a6abb21d872900baf848f53",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MISMATCH",
+          "match": false,
+          "submittedHash": "8513df32ef44dafeb0246ff9a128cf3b55ddbca63a553c2ef352b90fedfc9695",
+          "registeredHash": "74a3ce5330ca1271fcda4ef7d4a5777bd498bcdf2ac19a5a5bf8cba24ad54446"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "9c441679a200f6649f9616e9f192e75c3075fb0d4bf51ac7f8f5d1d44e45d03c",
+    "hash": "cc24eaf5467a4bda23f7f4f9fcd2912b68fd8989ed50d6ce70ed24b71c645268",
+    "merkleRoot": "78945bfa590080667aed04becd3402cd5f02bd1d950c183bf3c41f8700b26a36",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 21,
+    "timestamp": "2026-08-17T05:17:56.704Z",
+    "transactions": [
+      {
+        "transactionId": "tx-b1d5578c55748884-msws8vog",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-009",
+        "batchNumber": "BT-AUDIT-6251",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:17:56.703Z",
+        "dataHash": "7cfe78e110b72c1cd798887dedca276d834fcef5c48729d22f683cbf59480db3",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MISMATCH",
+          "match": false,
+          "submittedHash": "8513df32ef44dafeb0246ff9a128cf3b55ddbca63a553c2ef352b90fedfc9695",
+          "registeredHash": "74a3ce5330ca1271fcda4ef7d4a5777bd498bcdf2ac19a5a5bf8cba24ad54446"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "cc24eaf5467a4bda23f7f4f9fcd2912b68fd8989ed50d6ce70ed24b71c645268",
+    "hash": "bcc9d2e2f69afad6beddb3f89c8c43413165e647a44aee1bed4a993e85de4900",
+    "merkleRoot": "cc5c7792f10752d7d771fe1b221f2ce41baae30eae7a1d9a2128f41125cad7e5",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 22,
+    "timestamp": "2026-08-17T05:17:56.739Z",
+    "transactions": [
+      {
+        "transactionId": "tx-e649f412b756f76b-msws8vpf",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-009",
+        "batchNumber": "BT-AUDIT-6251",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:17:56.739Z",
+        "dataHash": "abe72491bb0692467e10b5fa552595f697aeb6da907ce4595c27ea3a36596a97",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MISMATCH",
+          "match": false,
+          "submittedHash": "8513df32ef44dafeb0246ff9a128cf3b55ddbca63a553c2ef352b90fedfc9695",
+          "registeredHash": "74a3ce5330ca1271fcda4ef7d4a5777bd498bcdf2ac19a5a5bf8cba24ad54446"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "bcc9d2e2f69afad6beddb3f89c8c43413165e647a44aee1bed4a993e85de4900",
+    "hash": "2e6c20c1ad842431a0c77e850424e2059fe12b3976051c32a9f2382c735b8862",
+    "merkleRoot": "93ab08c6af94755086ce5f8ba5eeb353c1168f59bad4f9315d17bafc8c76d01b",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 23,
+    "timestamp": "2026-08-17T05:18:28.547Z",
+    "transactions": [
+      {
+        "transactionId": "tx-77294a92a28358e5-msws9k8y",
+        "type": "MEDICINE_REGISTERED",
+        "medicineId": "MED-2024-010",
+        "batchNumber": "BT-AUDIT-8494",
+        "from": null,
+        "to": "Sun Pharma Laboratories",
+        "timestamp": "2026-08-17T05:18:28.546Z",
+        "dataHash": "86c329fd788c6a4ec59379fbe8218605c4cd7bb3d51094c1ce223ef34b6c4b3e",
+        "metadata": {
+          "medicineName": "Amoxicillin 250mg",
+          "manufacturerCode": "MFR-SUN-772",
+          "manufacturerName": "Sun Pharma Laboratories",
+          "manufacturingDate": "2024-01-01",
+          "expiryDate": "2026-01-01",
+          "role": "Manufacturer"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "2e6c20c1ad842431a0c77e850424e2059fe12b3976051c32a9f2382c735b8862",
+    "hash": "d92c4ec7fee2d9085d8b1d570346771ab1e6a7494f7a2d15aa9faea9bacac084",
+    "merkleRoot": "3adb0c299e150c0b7cd86df01c719f84ea9c871b0102463a7cfc222b18dda44d",
+    "validator": "validator-manufacturer"
+  },
+  {
+    "index": 24,
+    "timestamp": "2026-08-17T05:18:28.673Z",
+    "transactions": [
+      {
+        "transactionId": "tx-58cb9c4000c80072-msws9kch",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-010",
+        "batchNumber": "BT-AUDIT-8494",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:18:28.673Z",
+        "dataHash": "036275646a0e09767e27dfc67ff075bc5423f2f49dbd2948effa140e1297ab98",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "86c329fd788c6a4ec59379fbe8218605c4cd7bb3d51094c1ce223ef34b6c4b3e",
+          "registeredHash": "86c329fd788c6a4ec59379fbe8218605c4cd7bb3d51094c1ce223ef34b6c4b3e"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "d92c4ec7fee2d9085d8b1d570346771ab1e6a7494f7a2d15aa9faea9bacac084",
+    "hash": "27077347a9107787e1a06a50b1e5380672497dc4049571546c08634a8ebcd42d",
+    "merkleRoot": "1774e90050c4fdfa7e089d0752eb968eb559f3eca7e7c2435a7b034d651e9c92",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 25,
+    "timestamp": "2026-08-17T05:18:28.715Z",
+    "transactions": [
+      {
+        "transactionId": "tx-4132fa9189df1b8a-msws9kdn",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-010",
+        "batchNumber": "BT-AUDIT-8494",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:18:28.715Z",
+        "dataHash": "56b444d145d67eb790149c33524fbd482de892551e438c1abc24d2535c3452a1",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "86c329fd788c6a4ec59379fbe8218605c4cd7bb3d51094c1ce223ef34b6c4b3e",
+          "registeredHash": "86c329fd788c6a4ec59379fbe8218605c4cd7bb3d51094c1ce223ef34b6c4b3e"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "27077347a9107787e1a06a50b1e5380672497dc4049571546c08634a8ebcd42d",
+    "hash": "2b3a20f6e4c92967efd5ebc5780ef5508a79fc9bfd4ad1e972253fb621504097",
+    "merkleRoot": "47f696beadcfd3981fcc5c22150d0a8975f012d8fb9fbab12e4bc3d8ec1a37c0",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 26,
+    "timestamp": "2026-08-17T05:18:28.750Z",
+    "transactions": [
+      {
+        "transactionId": "tx-762a3f5e7a3ff7bd-msws9kem",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-010",
+        "batchNumber": "BT-AUDIT-8494",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:18:28.750Z",
+        "dataHash": "eb8afe94c43704156608959c220ec5dcd25a164ce41ad21f3cf1b274780440dc",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "86c329fd788c6a4ec59379fbe8218605c4cd7bb3d51094c1ce223ef34b6c4b3e",
+          "registeredHash": "86c329fd788c6a4ec59379fbe8218605c4cd7bb3d51094c1ce223ef34b6c4b3e"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "2b3a20f6e4c92967efd5ebc5780ef5508a79fc9bfd4ad1e972253fb621504097",
+    "hash": "4807fa833aec8f69ec8a496a5239fbbbf38cad6f8681e39b0ce5db72a9acbf96",
+    "merkleRoot": "851a30bc415f9bb78477be69e266eb1163837320a93e82d27d501488918fd380",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 27,
+    "timestamp": "2026-08-17T05:18:28.786Z",
+    "transactions": [
+      {
+        "transactionId": "tx-669ed4169d6aad15-msws9kfm",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-010",
+        "batchNumber": "BT-AUDIT-8494",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:18:28.786Z",
+        "dataHash": "d28eb7438edf985f8261788479678b569b24e499617bddf8b29c3f574166d77f",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "86c329fd788c6a4ec59379fbe8218605c4cd7bb3d51094c1ce223ef34b6c4b3e",
+          "registeredHash": "86c329fd788c6a4ec59379fbe8218605c4cd7bb3d51094c1ce223ef34b6c4b3e"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "4807fa833aec8f69ec8a496a5239fbbbf38cad6f8681e39b0ce5db72a9acbf96",
+    "hash": "6b73e76cf4e1973e64af01945d760ee4dab27525a3652d785d2083960b2eb9db",
+    "merkleRoot": "7d7be424fd7ded720aff87e27d65c55faf19d1b5c6843133718bccbc508ede4f",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 28,
+    "timestamp": "2026-08-17T05:18:28.824Z",
+    "transactions": [
+      {
+        "transactionId": "tx-7095ad37619c5956-msws9kgo",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-010",
+        "batchNumber": "BT-AUDIT-8494",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:18:28.824Z",
+        "dataHash": "7747166a8f6d6fb5a3b2c0b365ede85d8053c4850cd9e42b591ee1b035b2c2f1",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "86c329fd788c6a4ec59379fbe8218605c4cd7bb3d51094c1ce223ef34b6c4b3e",
+          "registeredHash": "86c329fd788c6a4ec59379fbe8218605c4cd7bb3d51094c1ce223ef34b6c4b3e"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "6b73e76cf4e1973e64af01945d760ee4dab27525a3652d785d2083960b2eb9db",
+    "hash": "d55ec1197950ee4f3614bdd64c94725db21310ce8ac03c696d7eb7308c7c5963",
+    "merkleRoot": "8d21da7cd650b6b192e45fc97635c7f9d1b68a3cbbae906627aa7a9690780f80",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 29,
+    "timestamp": "2026-08-17T05:18:28.859Z",
+    "transactions": [
+      {
+        "transactionId": "tx-55617e7ca03b22aa-msws9khn",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-010",
+        "batchNumber": "BT-AUDIT-8494",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:18:28.859Z",
+        "dataHash": "381e6be83288508af4e75fb1e3ca7214d600466d664cd6b582d30cee176de1b7",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "86c329fd788c6a4ec59379fbe8218605c4cd7bb3d51094c1ce223ef34b6c4b3e",
+          "registeredHash": "86c329fd788c6a4ec59379fbe8218605c4cd7bb3d51094c1ce223ef34b6c4b3e"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "d55ec1197950ee4f3614bdd64c94725db21310ce8ac03c696d7eb7308c7c5963",
+    "hash": "ab1b23c8d8d1f442ee3c080a0b6e5ed4da3c9d34b7fd6ed3af48091993c05f74",
+    "merkleRoot": "e2a92db47d90d6038a7d188a34a72233f6793386520cd59ace2c4d4af62202df",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 30,
+    "timestamp": "2026-08-17T05:18:28.896Z",
+    "transactions": [
+      {
+        "transactionId": "tx-ca7cfc7bb6addeb9-msws9kio",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-010",
+        "batchNumber": "BT-AUDIT-8494",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:18:28.896Z",
+        "dataHash": "02e149339c84d5c4a433246a93180a1c0d294a84b4579f5f30cf6c7f52066a52",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "86c329fd788c6a4ec59379fbe8218605c4cd7bb3d51094c1ce223ef34b6c4b3e",
+          "registeredHash": "86c329fd788c6a4ec59379fbe8218605c4cd7bb3d51094c1ce223ef34b6c4b3e"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "ab1b23c8d8d1f442ee3c080a0b6e5ed4da3c9d34b7fd6ed3af48091993c05f74",
+    "hash": "582f2c10a60b924931c2720912510c97835590a88a207f4cfe3925fbaa453949",
+    "merkleRoot": "91aa0eb622c4cec16fc74c65a35a84676359dd6b05b6adff06de4d1732404e5d",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 31,
+    "timestamp": "2026-08-17T05:18:28.931Z",
+    "transactions": [
+      {
+        "transactionId": "tx-cc8cf80700b212fd-msws9kjn",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-010",
+        "batchNumber": "BT-AUDIT-8494",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:18:28.931Z",
+        "dataHash": "283f83105aefa6a62002f7cbf31ba241422fcc8293a8a631911494467e1b5f9b",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "86c329fd788c6a4ec59379fbe8218605c4cd7bb3d51094c1ce223ef34b6c4b3e",
+          "registeredHash": "86c329fd788c6a4ec59379fbe8218605c4cd7bb3d51094c1ce223ef34b6c4b3e"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "582f2c10a60b924931c2720912510c97835590a88a207f4cfe3925fbaa453949",
+    "hash": "3c1c91e11a087fc5bf0cef63e8edb9694fd48ee57021d8f9cfcd1035630ca01f",
+    "merkleRoot": "732119b1372016745157af8157173d5693b8a0b6302254dad5645d7088c47293",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 32,
+    "timestamp": "2026-08-17T05:18:28.982Z",
+    "transactions": [
+      {
+        "transactionId": "tx-a685fae81a82ba42-msws9kl2",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-010",
+        "batchNumber": "BT-AUDIT-8494",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:18:28.982Z",
+        "dataHash": "698c87a5eaa5a3028f98151c0fcd8f9c73c4a41edaadfe4b8c572c2d4a603ca0",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "86c329fd788c6a4ec59379fbe8218605c4cd7bb3d51094c1ce223ef34b6c4b3e",
+          "registeredHash": "86c329fd788c6a4ec59379fbe8218605c4cd7bb3d51094c1ce223ef34b6c4b3e"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "3c1c91e11a087fc5bf0cef63e8edb9694fd48ee57021d8f9cfcd1035630ca01f",
+    "hash": "180a5f205b82bbe93b6b6050cd9009e552a1f49a8f6fba1a5246f5f94047c2b3",
+    "merkleRoot": "06424a06e8676b59abef285386418b4d0e0dfc0129569fb276cdef59b71d0f1c",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 33,
+    "timestamp": "2026-08-17T05:18:39.912Z",
+    "transactions": [
+      {
+        "transactionId": "tx-5dd39ae37f68af30-msws9t0o",
+        "type": "MEDICINE_REGISTERED",
+        "medicineId": "MED-2024-011",
+        "batchNumber": "BT-AUDIT-9880",
+        "from": null,
+        "to": "Sun Pharma Laboratories",
+        "timestamp": "2026-08-17T05:18:39.912Z",
+        "dataHash": "b341ba02cc0bad72ea79315c41771fe3a33016f31188c1530fb35b2a220770b6",
+        "metadata": {
+          "medicineName": "Amoxicillin 250mg",
+          "manufacturerCode": "MFR-SUN-772",
+          "manufacturerName": "Sun Pharma Laboratories",
+          "manufacturingDate": "2025-01-01",
+          "expiryDate": "2028-01-01",
+          "role": "Manufacturer"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "180a5f205b82bbe93b6b6050cd9009e552a1f49a8f6fba1a5246f5f94047c2b3",
+    "hash": "c9f08fe10571ddf2293b57b5a1c1f323f35cba3480b84a3933b7423bf9de6f39",
+    "merkleRoot": "ba172a0a5203f752b07bcae94b2b6021b757ea5f845ef5f0c8ed26283b3d7917",
+    "validator": "validator-manufacturer"
+  },
+  {
+    "index": 34,
+    "timestamp": "2026-08-17T05:18:39.956Z",
+    "transactions": [
+      {
+        "transactionId": "tx-b9a275824ff2b8a4-msws9t1w",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-011",
+        "batchNumber": "BT-AUDIT-9880",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:18:39.956Z",
+        "dataHash": "27bdfbd897e2981cd520e02b1a3e8e9cdcbf23674062f745d434bfaa2afffedc",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "b341ba02cc0bad72ea79315c41771fe3a33016f31188c1530fb35b2a220770b6",
+          "registeredHash": "b341ba02cc0bad72ea79315c41771fe3a33016f31188c1530fb35b2a220770b6"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "c9f08fe10571ddf2293b57b5a1c1f323f35cba3480b84a3933b7423bf9de6f39",
+    "hash": "d76e5dedc40a0a30bd6c010eb7db231774713137c543882d7e9064920ea16369",
+    "merkleRoot": "795221ab77da0511128c93e618f9e7eb57724fe4b61f76fa45f537bd4caab2e9",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 35,
+    "timestamp": "2026-08-17T05:18:39.985Z",
+    "transactions": [
+      {
+        "transactionId": "tx-8fb76565e7b9b434-msws9t2p",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-011",
+        "batchNumber": "BT-AUDIT-9880",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:18:39.985Z",
+        "dataHash": "906efc543403f22e77f715ed6b8ffdf6d067bbed3b27bdb8a2844a928ca56862",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "b341ba02cc0bad72ea79315c41771fe3a33016f31188c1530fb35b2a220770b6",
+          "registeredHash": "b341ba02cc0bad72ea79315c41771fe3a33016f31188c1530fb35b2a220770b6"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "d76e5dedc40a0a30bd6c010eb7db231774713137c543882d7e9064920ea16369",
+    "hash": "6f3aeebf84b7f314fea7ebdb4e989ff98cc83ab127cc83b584a35de7a04367b1",
+    "merkleRoot": "76f009450e11ca88abcf78ce5c5fd6026d51f9922ad52a8c7888b654a3f1836a",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 36,
+    "timestamp": "2026-08-17T05:18:40.013Z",
+    "transactions": [
+      {
+        "transactionId": "tx-b64a7fd69a8936eb-msws9t3h",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-011",
+        "batchNumber": "BT-AUDIT-9880",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:18:40.013Z",
+        "dataHash": "fb5d16ec69b73e44237b8169615c6229927592908c00fbc05b592659ca0a81b9",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "b341ba02cc0bad72ea79315c41771fe3a33016f31188c1530fb35b2a220770b6",
+          "registeredHash": "b341ba02cc0bad72ea79315c41771fe3a33016f31188c1530fb35b2a220770b6"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "6f3aeebf84b7f314fea7ebdb4e989ff98cc83ab127cc83b584a35de7a04367b1",
+    "hash": "ae86505ae4f4fb48e9e2cc3f20418e7799adf344554c1135cba9950974227202",
+    "merkleRoot": "676df6da6cf2576e1ff0be96329b10fb5b60ea901f3758956170375707549b6d",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 37,
+    "timestamp": "2026-08-17T05:18:40.043Z",
+    "transactions": [
+      {
+        "transactionId": "tx-7930cb525349de53-msws9t4b",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-011",
+        "batchNumber": "BT-AUDIT-9880",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:18:40.043Z",
+        "dataHash": "f38c563e1f2dcfcb9151b05310b13070fba66d156faaf3c2dee25663e0929e1e",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "b341ba02cc0bad72ea79315c41771fe3a33016f31188c1530fb35b2a220770b6",
+          "registeredHash": "b341ba02cc0bad72ea79315c41771fe3a33016f31188c1530fb35b2a220770b6"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "ae86505ae4f4fb48e9e2cc3f20418e7799adf344554c1135cba9950974227202",
+    "hash": "6708c65da4c33fa9c79240e0652a5326c09adceffae14a58dda61ef8191dde1b",
+    "merkleRoot": "afdacdbebc814162a6c0c590bbfb93d21a05a062d01bd2cc225afb6a0636e706",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 38,
+    "timestamp": "2026-08-17T05:18:40.077Z",
+    "transactions": [
+      {
+        "transactionId": "tx-733a525bd257de9c-msws9t59",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-011",
+        "batchNumber": "BT-AUDIT-9880",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:18:40.077Z",
+        "dataHash": "86e3b1336c000271f3d2695a8cfdda6e1ec7d021549df0b3ac92121fc44084ae",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "b341ba02cc0bad72ea79315c41771fe3a33016f31188c1530fb35b2a220770b6",
+          "registeredHash": "b341ba02cc0bad72ea79315c41771fe3a33016f31188c1530fb35b2a220770b6"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "6708c65da4c33fa9c79240e0652a5326c09adceffae14a58dda61ef8191dde1b",
+    "hash": "1faff11183b273a22ad1063d25208a18de909693a5cfc10feb924cf4d52172f3",
+    "merkleRoot": "39f4099209037c9fd57e93a76923e0b7e90df7bf89fbe6312a8d6e05d2c11c18",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 39,
+    "timestamp": "2026-08-17T05:18:40.105Z",
+    "transactions": [
+      {
+        "transactionId": "tx-862103604a6f0dfe-msws9t61",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-011",
+        "batchNumber": "BT-AUDIT-9880",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:18:40.105Z",
+        "dataHash": "14a6a35fd2c1f73173fed4f81a1b7b49ee384eb5f872f7e3265610d7630aad00",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "b341ba02cc0bad72ea79315c41771fe3a33016f31188c1530fb35b2a220770b6",
+          "registeredHash": "b341ba02cc0bad72ea79315c41771fe3a33016f31188c1530fb35b2a220770b6"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "1faff11183b273a22ad1063d25208a18de909693a5cfc10feb924cf4d52172f3",
+    "hash": "735ef9ddc1e6ec7e9dc1b5273b700c8c4aa714982b9e6243de4bd1a1661ed299",
+    "merkleRoot": "dc30141529df9761a7912380f964de5c79da53a7618ebe0b630ac65f95e7b886",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 40,
+    "timestamp": "2026-08-17T05:18:40.134Z",
+    "transactions": [
+      {
+        "transactionId": "tx-62f40b0cfddaa8f0-msws9t6u",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-011",
+        "batchNumber": "BT-AUDIT-9880",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:18:40.134Z",
+        "dataHash": "46c68f7b8e07603b8e7f9a90ea5631a2c7b5637422366e1e1a6622bf3740ebe9",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "b341ba02cc0bad72ea79315c41771fe3a33016f31188c1530fb35b2a220770b6",
+          "registeredHash": "b341ba02cc0bad72ea79315c41771fe3a33016f31188c1530fb35b2a220770b6"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "735ef9ddc1e6ec7e9dc1b5273b700c8c4aa714982b9e6243de4bd1a1661ed299",
+    "hash": "f3ce66986c3aba5daf2b959dd423988521b669b5244525ffdabd91348c814ffd",
+    "merkleRoot": "f7a1c03d8679416ae1bf96bfdf904a884ed84b411d6f18b2fac92acc39b6f7e5",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 41,
+    "timestamp": "2026-08-17T05:18:40.170Z",
+    "transactions": [
+      {
+        "transactionId": "tx-2ff23ae6503b2ad9-msws9t7t",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-011",
+        "batchNumber": "BT-AUDIT-9880",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:18:40.169Z",
+        "dataHash": "07a5be62179f00aca2e38de4b8c6e4584eb11852fcca09e76cba55630c5b9647",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "b341ba02cc0bad72ea79315c41771fe3a33016f31188c1530fb35b2a220770b6",
+          "registeredHash": "b341ba02cc0bad72ea79315c41771fe3a33016f31188c1530fb35b2a220770b6"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "f3ce66986c3aba5daf2b959dd423988521b669b5244525ffdabd91348c814ffd",
+    "hash": "649ab2149d4122836550ec33afeca1a09bf24096af9f1231e99e252e323a645b",
+    "merkleRoot": "f68d8beb6ca3ace917f1e486e2f80bacc8896372356ab97db9f246ad06ad2abe",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 42,
+    "timestamp": "2026-08-17T05:18:40.200Z",
+    "transactions": [
+      {
+        "transactionId": "tx-540c7a64200c25f4-msws9t8o",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-011",
+        "batchNumber": "BT-AUDIT-9880",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T05:18:40.199Z",
+        "dataHash": "e753559c2527ed5429104686dbd26d3425de7efc718f1f4a0043b90b17ebec9d",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "b341ba02cc0bad72ea79315c41771fe3a33016f31188c1530fb35b2a220770b6",
+          "registeredHash": "b341ba02cc0bad72ea79315c41771fe3a33016f31188c1530fb35b2a220770b6"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "649ab2149d4122836550ec33afeca1a09bf24096af9f1231e99e252e323a645b",
+    "hash": "236f7410960f2c3beff8efa6cdf7a5b658ffc1c3a48c7d54ad81687e07ae2c35",
+    "merkleRoot": "03007a0dd61975e5320f2aeda5015ebfd67177e6b2c6f6960afda38797db4409",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 43,
+    "timestamp": "2026-08-17T14:44:29.211Z",
+    "transactions": [
+      {
+        "transactionId": "tx-2ed60202dfa270fb-msxchggr",
+        "type": "MEDICINE_REGISTERED",
+        "medicineId": "MED-2024-012",
+        "batchNumber": "WEF",
+        "from": null,
+        "to": "awd",
+        "timestamp": "2026-08-17T14:44:29.210Z",
+        "dataHash": "83fb725c1ed545e3f2073ae515f1e5ceaa4505dc0a2936a478ac09c4f9d702d0",
+        "metadata": {
+          "medicineName": "11",
+          "manufacturerCode": "11",
+          "manufacturerName": "awd",
+          "manufacturingDate": "2026-08-20",
+          "expiryDate": "2026-09-05",
+          "role": "Manufacturer"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "236f7410960f2c3beff8efa6cdf7a5b658ffc1c3a48c7d54ad81687e07ae2c35",
+    "hash": "910417b6a168883fd6f6ce0b50c65b763e620c5284ba3be2fdcb121259f2822c",
+    "merkleRoot": "554953b10a35a6638795ac06b0d16a505df3b65f0171e1e01bd4eaf15b94ea34",
+    "validator": "validator-manufacturer"
+  },
+  {
+    "index": 44,
+    "timestamp": "2026-08-17T14:48:45.983Z",
+    "transactions": [
+      {
+        "transactionId": "tx-a97d70db2e861956-msxcmylb",
+        "type": "MEDICINE_TRANSFERRED",
+        "medicineId": "MED-2024-012",
+        "batchNumber": "WEF",
+        "from": "awd",
+        "to": "ayz",
+        "timestamp": "2026-08-17T14:48:45.983Z",
+        "dataHash": "c7bbac09932e4edaa8ecffdffe08cf5ad81a275719086a7c9b2ba776b686cf12",
+        "metadata": {
+          "fromRole": "Manufacturer",
+          "toRole": "Distributor",
+          "action": "TRANSFER_DISPATCHED"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "910417b6a168883fd6f6ce0b50c65b763e620c5284ba3be2fdcb121259f2822c",
+    "hash": "7a7cd95cae5a2b51750e2ec92d314aab812c923a1e74971bd5e5ded52f19ed5d",
+    "merkleRoot": "256ac6aaa2e6cd3b97c6be231ec49062cd804c3c11fd2d844959be308570ace1",
+    "validator": "validator-distributor"
+  },
+  {
+    "index": 45,
+    "timestamp": "2026-08-17T14:48:49.012Z",
+    "transactions": [
+      {
+        "transactionId": "tx-94e558a2f409115b-msxcn0xg",
+        "type": "MEDICINE_TRANSFERRED",
+        "medicineId": "MED-2024-011",
+        "batchNumber": "BT-AUDIT-9880",
+        "from": "Sun Pharma Laboratories",
+        "to": "ayz",
+        "timestamp": "2026-08-17T14:48:49.012Z",
+        "dataHash": "ef86c103af742d04789bdb5cba156c5f298e816b1b1002ea417ea0a742fe23d0",
+        "metadata": {
+          "fromRole": "Manufacturer",
+          "toRole": "Distributor",
+          "action": "TRANSFER_DISPATCHED"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "7a7cd95cae5a2b51750e2ec92d314aab812c923a1e74971bd5e5ded52f19ed5d",
+    "hash": "533d8b7fcf78d4840fafe25ad8abaa0d27ccbb4029c95c6bf6592b955fe630b8",
+    "merkleRoot": "43532633f1a1690e569531cff4076e3d75c58652d88e08b32603308e08a3248e",
+    "validator": "validator-distributor"
+  },
+  {
+    "index": 46,
+    "timestamp": "2026-08-17T15:31:06.824Z",
+    "transactions": [
+      {
+        "transactionId": "tx-7d726a3d0602b575-msxe5f47",
+        "type": "MEDICINE_REGISTERED",
+        "medicineId": "MED-2024-001",
+        "batchNumber": "BT001",
+        "from": null,
+        "to": "XYZ Pharma Ltd.",
+        "timestamp": "2026-08-17T15:31:06.822Z",
+        "dataHash": "589095c21e5d139d4572badd69d70e8407518b7d4059300bc6cbf0f858052a10",
+        "metadata": {
+          "medicineName": "Paracetamol 500mg",
+          "manufacturerCode": "MFR-XYZ-001",
+          "manufacturerName": "XYZ Pharma Ltd.",
+          "manufacturingDate": "2024-01-15",
+          "expiryDate": "2026-01-15",
+          "role": "Manufacturer"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "533d8b7fcf78d4840fafe25ad8abaa0d27ccbb4029c95c6bf6592b955fe630b8",
+    "hash": "5cced319cc6258b549ed9a5eda58cb77d9eb82b2e8f0a52da20eb016e52ec125",
+    "merkleRoot": "f1d77b9b82b74ad658dd94c8a0ee458b2e8ee0fed5993dbbbec7bc161852a06f",
+    "validator": "validator-manufacturer"
+  },
+  {
+    "index": 47,
+    "timestamp": "2026-08-17T15:35:09.886Z",
+    "transactions": [
+      {
+        "transactionId": "tx-21ce35e4cda98ea0-msxeamny",
+        "type": "MEDICINE_REGISTERED",
+        "medicineId": "MED-2024-013",
+        "batchNumber": "BT-LIVE-9855",
+        "from": null,
+        "to": "Sun Pharma Advanced Research",
+        "timestamp": "2026-08-17T15:35:09.886Z",
+        "dataHash": "7fc740a7bf8b0f3bf911d7060c81c3c3e9f95fe986cd38ae3887f1e3e8b7a17d",
+        "metadata": {
+          "medicineName": "Amoxicillin Trihydrate 500mg",
+          "manufacturerCode": "MFR-SUN-772",
+          "manufacturerName": "Sun Pharma Advanced Research",
+          "manufacturingDate": "2025-01-01",
+          "expiryDate": "2028-01-01",
+          "role": "Manufacturer"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "5cced319cc6258b549ed9a5eda58cb77d9eb82b2e8f0a52da20eb016e52ec125",
+    "hash": "17a00db052d26ae6277f49d651e07a58b2d17c877c128d39f2459ec67326b132",
+    "merkleRoot": "52805c1953371326d8a1a109dc63c5ffc3a458ab2cdff0cbc431eac8648efa2a",
+    "validator": "validator-authority-root"
+  },
+  {
+    "index": 48,
+    "timestamp": "2026-08-17T15:35:10.007Z",
+    "transactions": [
+      {
+        "transactionId": "tx-f3be5aa8f80c9775-msxeamrb",
+        "type": "MEDICINE_TRANSFERRED",
+        "medicineId": "MED-2024-013",
+        "batchNumber": "BT-LIVE-9855",
+        "from": "Sun Pharma Advanced Research",
+        "to": "DrugChain Network Authority",
+        "timestamp": "2026-08-17T15:35:10.007Z",
+        "dataHash": "e0e58bdb30f91498512283c700485092bdd652e44e286a6cc875e70ebc13b266",
+        "metadata": {
+          "fromRole": "Manufacturer",
+          "toRole": "Distributor",
+          "action": "TRANSFER_DISPATCHED"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "17a00db052d26ae6277f49d651e07a58b2d17c877c128d39f2459ec67326b132",
+    "hash": "a6f1030e6be66f81e158cd3819512e58d226ec5bf0801eea4f3d3925316c55ea",
+    "merkleRoot": "0ff0573726fe5a67b2615fbd7be4e0ba46a85fa4bde2f5568d93a699c2b7ebbc",
+    "validator": "validator-distributor"
+  },
+  {
+    "index": 49,
+    "timestamp": "2026-08-17T15:35:10.066Z",
+    "transactions": [
+      {
+        "transactionId": "tx-d074d4f13a7ceb2e-msxeamsy",
+        "type": "RECEIPT_CONFIRMED",
+        "medicineId": "MED-2024-013",
+        "batchNumber": "BT-LIVE-9855",
+        "from": "DrugChain Network Authority",
+        "to": "DrugChain Network Authority",
+        "timestamp": "2026-08-17T15:35:10.065Z",
+        "dataHash": "b17ec16cbc62c18261363710eabbcd0b12d60379ecb02ba9dff5dee9b0c2f992",
+        "metadata": {
+          "actor": "DrugChain Network Authority",
+          "role": "Pharmacy",
+          "action": "CUSTODY_CONFIRMED"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "a6f1030e6be66f81e158cd3819512e58d226ec5bf0801eea4f3d3925316c55ea",
+    "hash": "dc1a835ad10c23c5c87b9592808ee67d2bed2b27ca190f2711fea028bf85ecc2",
+    "merkleRoot": "5ad54dc6ab773df20de67776759a9d2f4a66b415b861ab1a637689bbc9ed0761",
+    "validator": "validator-pharmacy"
+  },
+  {
+    "index": 50,
+    "timestamp": "2026-08-17T15:35:10.108Z",
+    "transactions": [
+      {
+        "transactionId": "tx-080d3256c94e415c-msxeamu4",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-013",
+        "batchNumber": "BT-LIVE-9855",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T15:35:10.108Z",
+        "dataHash": "324bba7645461cd343007d6a80ae366d5d04cb268c046d74c9fe63ebaa312a06",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "7fc740a7bf8b0f3bf911d7060c81c3c3e9f95fe986cd38ae3887f1e3e8b7a17d",
+          "registeredHash": "7fc740a7bf8b0f3bf911d7060c81c3c3e9f95fe986cd38ae3887f1e3e8b7a17d"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "dc1a835ad10c23c5c87b9592808ee67d2bed2b27ca190f2711fea028bf85ecc2",
+    "hash": "778e4b113853d5d1120b9713ac15f06c5d4efebb6356050ab433728486011cb7",
+    "merkleRoot": "aeb764f25df186611f61b465573bf52235ec78b63f61862197f64b7091be111b",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 51,
+    "timestamp": "2026-08-17T15:35:45.134Z",
+    "transactions": [
+      {
+        "transactionId": "tx-647355aa26b63e5e-msxebdv2",
+        "type": "MEDICINE_REGISTERED",
+        "medicineId": "MED-2024-014",
+        "batchNumber": "BT-LIVE-5108",
+        "from": null,
+        "to": "Sun Pharma Advanced Research",
+        "timestamp": "2026-08-17T15:35:45.134Z",
+        "dataHash": "f0fff6b0c6a4161da6fad3e4710dcee7377f11d5f2c3d9911b3bd959c63582c2",
+        "metadata": {
+          "medicineName": "Amoxicillin Trihydrate 500mg",
+          "manufacturerCode": "MFR-SUN-772",
+          "manufacturerName": "Sun Pharma Advanced Research",
+          "manufacturingDate": "2025-01-01",
+          "expiryDate": "2028-01-01",
+          "role": "Manufacturer"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "778e4b113853d5d1120b9713ac15f06c5d4efebb6356050ab433728486011cb7",
+    "hash": "10e0cc0802f9c05be1332ed7a8e1080f49def2dca221a2efed17d3f9d34cd380",
+    "merkleRoot": "2a1894f3d18e69083f8a745ddc5317ef0347c32cc9d87768b5650d0991b056e6",
+    "validator": "validator-authority-root"
+  },
+  {
+    "index": 52,
+    "timestamp": "2026-08-17T15:35:45.203Z",
+    "transactions": [
+      {
+        "transactionId": "tx-ebb2ea47ea4b435f-msxebdwz",
+        "type": "MEDICINE_TRANSFERRED",
+        "medicineId": "MED-2024-014",
+        "batchNumber": "BT-LIVE-5108",
+        "from": "Sun Pharma Advanced Research",
+        "to": "DrugChain Network Authority",
+        "timestamp": "2026-08-17T15:35:45.202Z",
+        "dataHash": "203c2d8a3cb7453474c32327dc6c21715a74713aff70adc5a4fd7cba77bf5884",
+        "metadata": {
+          "fromRole": "Manufacturer",
+          "toRole": "Distributor",
+          "action": "TRANSFER_DISPATCHED"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "10e0cc0802f9c05be1332ed7a8e1080f49def2dca221a2efed17d3f9d34cd380",
+    "hash": "5bc610f91d0f6e6c8c1c08f80d731581abd8b1888183398130b31bcaa644ef9a",
+    "merkleRoot": "7d64ef09a862514b35c60117c683627242d08747ccd5295d63e48395b6dde0fa",
+    "validator": "validator-distributor"
+  },
+  {
+    "index": 53,
+    "timestamp": "2026-08-17T15:35:45.243Z",
+    "transactions": [
+      {
+        "transactionId": "tx-6c598b9f7e98cfda-msxebdy3",
+        "type": "RECEIPT_CONFIRMED",
+        "medicineId": "MED-2024-014",
+        "batchNumber": "BT-LIVE-5108",
+        "from": "DrugChain Network Authority",
+        "to": "DrugChain Network Authority",
+        "timestamp": "2026-08-17T15:35:45.243Z",
+        "dataHash": "1484f0c2302f0cfb26ab6cef530b78f996e2c5fc9d0e014df776c2840678e05b",
+        "metadata": {
+          "actor": "DrugChain Network Authority",
+          "role": "Pharmacy",
+          "action": "CUSTODY_CONFIRMED"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "5bc610f91d0f6e6c8c1c08f80d731581abd8b1888183398130b31bcaa644ef9a",
+    "hash": "1644f94dea5c4cfdc152367775d30936de00e8902cbff7024092b8941ee91e78",
+    "merkleRoot": "6f2e4708eede516e78347d456d9a553866fa2b192b61f6878a28c7052637cbcf",
+    "validator": "validator-pharmacy"
+  },
+  {
+    "index": 54,
+    "timestamp": "2026-08-17T15:35:45.277Z",
+    "transactions": [
+      {
+        "transactionId": "tx-bbd67e01048fd223-msxebdz1",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-014",
+        "batchNumber": "BT-LIVE-5108",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-17T15:35:45.277Z",
+        "dataHash": "312c8d26f25847339a1d3dede03ec0ef78d59f0e0420e8d081fd9f4e94292c67",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "f0fff6b0c6a4161da6fad3e4710dcee7377f11d5f2c3d9911b3bd959c63582c2",
+          "registeredHash": "f0fff6b0c6a4161da6fad3e4710dcee7377f11d5f2c3d9911b3bd959c63582c2"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "1644f94dea5c4cfdc152367775d30936de00e8902cbff7024092b8941ee91e78",
+    "hash": "4452a983a19d8a042000983bc5f6526891be64ad707f8b88a81e683c73f5efaa",
+    "merkleRoot": "a6810e951d79551507761b7f183d2136f5db6c2c2f6112c62a41aecca78cb230",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 55,
+    "timestamp": "2026-08-17T16:24:09.249Z",
+    "transactions": [
+      {
+        "transactionId": "tx-f358315ded2403d5-msxg1mox",
+        "type": "MEDICINE_REGISTERED",
+        "medicineId": "MED-2024-015",
+        "batchNumber": "1111",
+        "from": null,
+        "to": "as",
+        "timestamp": "2026-08-17T16:24:09.248Z",
+        "dataHash": "486308e60bc20d20478a3ad0958fb29a99efe2615c6746ff6a1b76b0c21d4bc8",
+        "metadata": {
+          "medicineName": "111",
+          "manufacturerCode": "as",
+          "manufacturerName": "as",
+          "manufacturingDate": "2026-08-12",
+          "expiryDate": "2026-09-05",
+          "role": "Manufacturer"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "4452a983a19d8a042000983bc5f6526891be64ad707f8b88a81e683c73f5efaa",
+    "hash": "d8bae8d25a4a6dacd9c356c426b1831d25fb50dd52c8183126d6f560a3f0be61",
+    "merkleRoot": "86ccd51b13fba384c591e42b1b34cd860378ab04d597e90198c3f3942d7d6a63",
+    "validator": "validator-manufacturer"
+  },
+  {
+    "index": 56,
+    "timestamp": "2026-08-18T05:19:23.942Z",
+    "transactions": [
+      {
+        "transactionId": "tx-17da2d2af28982d1-msy7qlnp",
+        "type": "MEDICINE_REGISTERED",
+        "medicineId": "MED-2024-016",
+        "batchNumber": "1",
+        "from": null,
+        "to": "asaa",
+        "timestamp": "2026-08-18T05:19:23.941Z",
+        "dataHash": "e1cf136cfa10990f81589f42640bd2a36dcfdb5018b511e4ae089a22edd03e23",
+        "metadata": {
+          "medicineName": "xyz",
+          "manufacturerCode": "l",
+          "manufacturerName": "asaa",
+          "manufacturingDate": "2026-08-10",
+          "expiryDate": "2026-08-29",
+          "role": "Manufacturer"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "d8bae8d25a4a6dacd9c356c426b1831d25fb50dd52c8183126d6f560a3f0be61",
+    "hash": "8947942664ee6d3e67cf3bade18c787edbfb829eec02754ba8849d0ca5a7ef6f",
+    "merkleRoot": "be6978ffdbd003f4efae79303b0f37cbe52968d105feaa65ece961d66c6bcfc9",
+    "validator": "validator-manufacturer"
+  },
+  {
+    "index": 57,
+    "timestamp": "2026-08-18T05:22:17.577Z",
+    "transactions": [
+      {
+        "transactionId": "tx-dd79423be5691628-msy7ubmx",
+        "type": "MEDICINE_TRANSFERRED",
+        "medicineId": "MED-2024-015",
+        "batchNumber": "1111",
+        "from": "as",
+        "to": "ss",
+        "timestamp": "2026-08-18T05:22:17.576Z",
+        "dataHash": "a2365f555bdad837b2a9d89122399d0359173ce57d44aaa58f760c22cca13410",
+        "metadata": {
+          "fromRole": "Manufacturer",
+          "toRole": "Distributor",
+          "action": "TRANSFER_DISPATCHED"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "8947942664ee6d3e67cf3bade18c787edbfb829eec02754ba8849d0ca5a7ef6f",
+    "hash": "20c27addbde032fe596c805cd4d777106782e53d9123ad361972803474601180",
+    "merkleRoot": "78e0161dc00a8e4b42c2bb01ba84107f8c2b8639b629023fc11f8a93b0113c99",
+    "validator": "validator-distributor"
+  },
+  {
+    "index": 58,
+    "timestamp": "2026-08-18T05:24:43.884Z",
+    "transactions": [
+      {
+        "transactionId": "tx-6e8cb23211196db3-msy7xgj0",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-001",
+        "batchNumber": "BT001",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-18T05:24:43.884Z",
+        "dataHash": "4d613321a226c9da995c15434566b264f1d18cc136c902076ca0feecd1677592",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "589095c21e5d139d4572badd69d70e8407518b7d4059300bc6cbf0f858052a10",
+          "registeredHash": "589095c21e5d139d4572badd69d70e8407518b7d4059300bc6cbf0f858052a10"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "20c27addbde032fe596c805cd4d777106782e53d9123ad361972803474601180",
+    "hash": "3813bec19ee517c76da4ccf7195d662793302f444d01fb93c29810ba937fcf0a",
+    "merkleRoot": "d953e9aa03315f2a61914d7d9ad3f083e8e3c83678557f2b2854b70b45860166",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 59,
+    "timestamp": "2026-08-18T05:24:43.906Z",
+    "transactions": [
+      {
+        "transactionId": "tx-7031eee681f57a4c-msy7xgjm",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-001",
+        "batchNumber": "BT001",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-18T05:24:43.906Z",
+        "dataHash": "56e3cea36b02805bba31393cab67efce71bb44aa2027b50f03d340b205248707",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "589095c21e5d139d4572badd69d70e8407518b7d4059300bc6cbf0f858052a10",
+          "registeredHash": "589095c21e5d139d4572badd69d70e8407518b7d4059300bc6cbf0f858052a10"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "3813bec19ee517c76da4ccf7195d662793302f444d01fb93c29810ba937fcf0a",
+    "hash": "7114996670d5c4be025c90af267a728b1007e3b4aae7200b0255a5e2dabd079b",
+    "merkleRoot": "6a191141e69960a685fe6e90f6d2e45ce92f39676144145e73f6018766234c6e",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 60,
+    "timestamp": "2026-08-18T05:25:41.347Z",
+    "transactions": [
+      {
+        "transactionId": "tx-9efb9496a88bd110-msy7yov7",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-001",
+        "batchNumber": "BT001",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-18T05:25:41.346Z",
+        "dataHash": "23953462f05460d9c9a56536b4ce4186fbe853d0bf1d373560713c65103863c3",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "589095c21e5d139d4572badd69d70e8407518b7d4059300bc6cbf0f858052a10",
+          "registeredHash": "589095c21e5d139d4572badd69d70e8407518b7d4059300bc6cbf0f858052a10"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "7114996670d5c4be025c90af267a728b1007e3b4aae7200b0255a5e2dabd079b",
+    "hash": "d56068a53d7868d614f92f8737ac764ab451e5152e4d32824732157f312677db",
+    "merkleRoot": "90a8a56e8feb831fa4582c64d9bd165e62c342a5f8385c5bbac0e52143f7eaf3",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 61,
+    "timestamp": "2026-08-18T05:25:41.364Z",
+    "transactions": [
+      {
+        "transactionId": "tx-ea69e04dc3196ec0-msy7yovo",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-001",
+        "batchNumber": "BT001",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-18T05:25:41.364Z",
+        "dataHash": "397487afead41a8c64cfde20afb4de22e60365bcc784c9a30f3e33fe5fb5c660",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "589095c21e5d139d4572badd69d70e8407518b7d4059300bc6cbf0f858052a10",
+          "registeredHash": "589095c21e5d139d4572badd69d70e8407518b7d4059300bc6cbf0f858052a10"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "d56068a53d7868d614f92f8737ac764ab451e5152e4d32824732157f312677db",
+    "hash": "fa182edc363bcf49221f6542ab4849eced7542d3ce250d2336f24e3d90c1a444",
+    "merkleRoot": "ef9d9996c4821e3dfa343ad42fb3b0a17bf05951fef730b041b51030e1e52e69",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 62,
+    "timestamp": "2026-08-18T05:30:01.062Z",
+    "transactions": [
+      {
+        "transactionId": "tx-a00fd9b52cf92cfb-msy8499i",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-016",
+        "batchNumber": "1",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-18T05:30:01.062Z",
+        "dataHash": "7258a1ca086f055db88cd5e5708c0b73d74ed502f8e9208f3b3b5b1355e6782b",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "e1cf136cfa10990f81589f42640bd2a36dcfdb5018b511e4ae089a22edd03e23",
+          "registeredHash": "e1cf136cfa10990f81589f42640bd2a36dcfdb5018b511e4ae089a22edd03e23"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "fa182edc363bcf49221f6542ab4849eced7542d3ce250d2336f24e3d90c1a444",
+    "hash": "b2de521979b24433d8b7c847106ca5d10ffa41ec51a7e0e025ae65fc3df0a46e",
+    "merkleRoot": "597e7806084e25fbceb0e8e427f5f703aaaef33abb094bc8b01f3048756e95ae",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 63,
+    "timestamp": "2026-08-18T05:30:52.621Z",
+    "transactions": [
+      {
+        "transactionId": "tx-971e44b188d1d0d7-msy85d1p",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-001",
+        "batchNumber": "BT001",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-18T05:30:52.621Z",
+        "dataHash": "03a1a6bbc26ba4438d474be5d1b00f04bc1456a63489ad9c189982b8d34ab7b2",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "589095c21e5d139d4572badd69d70e8407518b7d4059300bc6cbf0f858052a10",
+          "registeredHash": "589095c21e5d139d4572badd69d70e8407518b7d4059300bc6cbf0f858052a10"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "b2de521979b24433d8b7c847106ca5d10ffa41ec51a7e0e025ae65fc3df0a46e",
+    "hash": "de8f45c0fd6c88e294f46d21cb5f883919c12cec5fea5a3f129483df91b078e4",
+    "merkleRoot": "d85313bf5f8d49ff3e8f2d5245b6c3c7944249485990353d34a317207fac6c31",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 64,
+    "timestamp": "2026-08-18T05:30:52.639Z",
+    "transactions": [
+      {
+        "transactionId": "tx-dfefc8e1806fab72-msy85d27",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-001",
+        "batchNumber": "BT001",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-18T05:30:52.639Z",
+        "dataHash": "de533ea3d55ff0f2896c550d0e79e6e5aa7dbf9bd4e583e4d60c6cdcbbd12654",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "589095c21e5d139d4572badd69d70e8407518b7d4059300bc6cbf0f858052a10",
+          "registeredHash": "589095c21e5d139d4572badd69d70e8407518b7d4059300bc6cbf0f858052a10"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "de8f45c0fd6c88e294f46d21cb5f883919c12cec5fea5a3f129483df91b078e4",
+    "hash": "ea778cb51265810f74832b60c3b7e126cb43fc10a286d6b2618f5d9cea09f414",
+    "merkleRoot": "0539e47554b56d46e6f8557378745336cea9386545df5cb3368bf7954c6e213b",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 65,
+    "timestamp": "2026-08-18T05:54:00.243Z",
+    "transactions": [
+      {
+        "transactionId": "tx-93fe53f4dc6d68d3-msy8z3qr",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-001",
+        "batchNumber": "BT001",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-18T05:54:00.243Z",
+        "dataHash": "9379670e985fb927f95b5e6e2488622bb44760061dbee9545ce43d7a9dc49c20",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "589095c21e5d139d4572badd69d70e8407518b7d4059300bc6cbf0f858052a10",
+          "registeredHash": "589095c21e5d139d4572badd69d70e8407518b7d4059300bc6cbf0f858052a10"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "ea778cb51265810f74832b60c3b7e126cb43fc10a286d6b2618f5d9cea09f414",
+    "hash": "e69c9e7be79564638004176d11424cd30c15dad33b59ff81aa10fecdf51b810f",
+    "merkleRoot": "5f22581da6847de909ec6ff8bee86c489a44ef0babb2ae9ddcaec2805436f6b1",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 66,
+    "timestamp": "2026-08-18T05:54:00.263Z",
+    "transactions": [
+      {
+        "transactionId": "tx-a54424d29b79bd07-msy8z3rb",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-001",
+        "batchNumber": "BT001",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-18T05:54:00.263Z",
+        "dataHash": "0e562e4e35565ecca15d31790a15b7e24f2df68ab02c8d9d14e652c6f1e998ac",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "589095c21e5d139d4572badd69d70e8407518b7d4059300bc6cbf0f858052a10",
+          "registeredHash": "589095c21e5d139d4572badd69d70e8407518b7d4059300bc6cbf0f858052a10"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "e69c9e7be79564638004176d11424cd30c15dad33b59ff81aa10fecdf51b810f",
+    "hash": "ccbb6b55818530f88b7d4864c235566bcb7862c6d6f4f4ce45f6eb4685cf1019",
+    "merkleRoot": "3a0a9109fc5dfa67d4a5e0d448c9481caae87b6a27f23392196c849cedc69112",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 67,
+    "timestamp": "2026-08-19T05:42:24.845Z",
+    "transactions": [
+      {
+        "transactionId": "tx-7cf9de2c2a02d632-mszo01u4",
+        "type": "MEDICINE_REGISTERED",
+        "medicineId": "MED-2024-017",
+        "batchNumber": "10",
+        "from": null,
+        "to": "xyz",
+        "timestamp": "2026-08-19T05:42:24.844Z",
+        "dataHash": "7b87f0bfc34f301b1a93a5ad631c36fba0598d2f569fb01c10b6ac10916e35ec",
+        "metadata": {
+          "medicineName": "1",
+          "manufacturerCode": "a1",
+          "manufacturerName": "xyz",
+          "manufacturingDate": "2026-08-07",
+          "expiryDate": "2026-09-04",
+          "role": "Manufacturer"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "ccbb6b55818530f88b7d4864c235566bcb7862c6d6f4f4ce45f6eb4685cf1019",
+    "hash": "b3fae760cf83e854a34e184408b2c43018a612b5ea557a9736721e515206e330",
+    "merkleRoot": "f14ece88fedc799777f93e58033b7ae3362c96d29b0c86c0da6b92fe299fe8e9",
+    "validator": "validator-manufacturer"
+  },
+  {
+    "index": 68,
+    "timestamp": "2026-08-19T05:45:33.329Z",
+    "transactions": [
+      {
+        "transactionId": "tx-c2d29053052c518b-mszo439t",
+        "type": "MEDICINE_TRANSFERRED",
+        "medicineId": "MED-2024-017",
+        "batchNumber": "10",
+        "from": "xyz",
+        "to": "xyz",
+        "timestamp": "2026-08-19T05:45:33.329Z",
+        "dataHash": "8b3f45e9cfbac7c553871eabe7b96c47ad76d984d185e4c8a7e99af4cf89d3f5",
+        "metadata": {
+          "fromRole": "Manufacturer",
+          "toRole": "Distributor",
+          "action": "TRANSFER_DISPATCHED"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "b3fae760cf83e854a34e184408b2c43018a612b5ea557a9736721e515206e330",
+    "hash": "bcf3c2a4e8cb782e5d274657929fd97a1552964f15a8b0e01b9f095722edc64d",
+    "merkleRoot": "c9ad7795d6bdbd60a3f741a7464c559cf141f3eeb2b710ec2bf5e0ed17b85d6a",
+    "validator": "validator-distributor"
+  },
+  {
+    "index": 69,
+    "timestamp": "2026-08-19T05:46:23.402Z",
+    "transactions": [
+      {
+        "transactionId": "tx-796de7b87173c545-mszo55wq",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-017",
+        "batchNumber": "10",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-19T05:46:23.402Z",
+        "dataHash": "4c969fd729103ab9461385812463d617d84938db5658b91a130b9f2b2b46339a",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "7b87f0bfc34f301b1a93a5ad631c36fba0598d2f569fb01c10b6ac10916e35ec",
+          "registeredHash": "7b87f0bfc34f301b1a93a5ad631c36fba0598d2f569fb01c10b6ac10916e35ec"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "bcf3c2a4e8cb782e5d274657929fd97a1552964f15a8b0e01b9f095722edc64d",
+    "hash": "ae3b6b08135233f75cd73dea30dcdc47544260a51111d0419c65169b6b02370f",
+    "merkleRoot": "c0b4b784e18098bc886fb71e598cf87542d21be41dfbbbc3f8c6d9b8bf2b2007",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 70,
+    "timestamp": "2026-08-19T05:46:28.074Z",
+    "transactions": [
+      {
+        "transactionId": "tx-d9b00e39cdb02fcf-mszo59ii",
+        "type": "RECEIPT_CONFIRMED",
+        "medicineId": "MED-2024-017",
+        "batchNumber": "10",
+        "from": "xyz",
+        "to": "xyz",
+        "timestamp": "2026-08-19T05:46:28.074Z",
+        "dataHash": "c11e21e40abec0273bc6457293d710afc962a59ee7be17106302a2c756076301",
+        "metadata": {
+          "actor": "xyz",
+          "role": "Pharmacy",
+          "action": "CUSTODY_CONFIRMED"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "ae3b6b08135233f75cd73dea30dcdc47544260a51111d0419c65169b6b02370f",
+    "hash": "c5cba66ff7c87b2db7136aae94d61ed789408ca248af9c5cd310abc270516e3a",
+    "merkleRoot": "c78a628848b0dfa1c0981392562f5504957d32ca3919ad51310a83361fba7b55",
+    "validator": "validator-pharmacy"
+  },
+  {
+    "index": 71,
+    "timestamp": "2026-08-19T05:47:20.155Z",
+    "transactions": [
+      {
+        "transactionId": "tx-a8d93782675aaa51-mszo6dp7",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-017",
+        "batchNumber": "10",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-19T05:47:20.155Z",
+        "dataHash": "b77ea03d79468b3d3e35a21ec6ef361cfa40274f5ee3bd87bf484e53b42f04a3",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "7b87f0bfc34f301b1a93a5ad631c36fba0598d2f569fb01c10b6ac10916e35ec",
+          "registeredHash": "7b87f0bfc34f301b1a93a5ad631c36fba0598d2f569fb01c10b6ac10916e35ec"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "c5cba66ff7c87b2db7136aae94d61ed789408ca248af9c5cd310abc270516e3a",
+    "hash": "5eb5fd11e80a4ce09781b8ed36998e255554b2fd2075b0687530ac92704d517e",
+    "merkleRoot": "754ec24c36fd127d215034a0c17ab5e27d896c0d2124768e40e35c80fe4dd317",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 72,
+    "timestamp": "2026-08-19T05:47:20.180Z",
+    "transactions": [
+      {
+        "transactionId": "tx-01e854f9a1b00538-mszo6dpw",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-017",
+        "batchNumber": "10",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-19T05:47:20.180Z",
+        "dataHash": "acda2b74413acc490e75a36853bd682ff6b46da846d27f535c5f0e6177d3ada5",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "7b87f0bfc34f301b1a93a5ad631c36fba0598d2f569fb01c10b6ac10916e35ec",
+          "registeredHash": "7b87f0bfc34f301b1a93a5ad631c36fba0598d2f569fb01c10b6ac10916e35ec"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "5eb5fd11e80a4ce09781b8ed36998e255554b2fd2075b0687530ac92704d517e",
+    "hash": "aa2cb42e1f8f7a393f3c6087c16c2f175ab1080f0c5605d3f7d062a3514f3396",
+    "merkleRoot": "b06e1b87e02e1adb7f9d5a821eb8ab067dcd94e001a2255de5edc4904ce4648c",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 73,
+    "timestamp": "2026-08-19T06:04:22.212Z",
+    "transactions": [
+      {
+        "transactionId": "tx-f3e3642ff779ca28-mszosabo",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-017",
+        "batchNumber": "10",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-19T06:04:22.212Z",
+        "dataHash": "cf84a8859d8ae51108025b79497a2e1acd8e99885ddf2e29a553cef4fdac9fac",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "7b87f0bfc34f301b1a93a5ad631c36fba0598d2f569fb01c10b6ac10916e35ec",
+          "registeredHash": "7b87f0bfc34f301b1a93a5ad631c36fba0598d2f569fb01c10b6ac10916e35ec"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "aa2cb42e1f8f7a393f3c6087c16c2f175ab1080f0c5605d3f7d062a3514f3396",
+    "hash": "5702dab381c3a60a0d5fb7226511442742a0cdec22fac00361e165aa2badd1c3",
+    "merkleRoot": "2c1f0ff896b9f4af90d946cf6c2c0bc8c55aa0b0ecd301b8dd05ec1a6c6a70d7",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 74,
+    "timestamp": "2026-08-19T06:05:32.705Z",
+    "transactions": [
+      {
+        "transactionId": "tx-158aca9b2465d11f-mszotspt",
+        "type": "RECEIPT_CONFIRMED",
+        "medicineId": "MED-2024-017",
+        "batchNumber": "10",
+        "from": "xyz",
+        "to": "xyz",
+        "timestamp": "2026-08-19T06:05:32.705Z",
+        "dataHash": "4a637e26a8f2b4d12bdb59f57666e6fff9ec9b9a9e7184bdcb673d44d683f6c7",
+        "metadata": {
+          "actor": "xyz",
+          "role": "Pharmacy",
+          "action": "CUSTODY_CONFIRMED"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "5702dab381c3a60a0d5fb7226511442742a0cdec22fac00361e165aa2badd1c3",
+    "hash": "b617f5ff501fa3d1ab15cfacfb9d5ef2b6f0571b076552f1f1ae94d98517138d",
+    "merkleRoot": "4db7f66ed652605aa2907d9c22c70e83b51bffe43ad8ea95459177122f51abe4",
+    "validator": "validator-pharmacy"
+  },
+  {
+    "index": 75,
+    "timestamp": "2026-08-19T06:07:20.275Z",
+    "transactions": [
+      {
+        "transactionId": "tx-018f59b674f9ae27-mszow3pv",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-017",
+        "batchNumber": "10",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-19T06:07:20.275Z",
+        "dataHash": "76fc896a0e17e4a0eea6bb696d58b8788fe72bd335928dfaa0a9aa6b2966a5da",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "7b87f0bfc34f301b1a93a5ad631c36fba0598d2f569fb01c10b6ac10916e35ec",
+          "registeredHash": "7b87f0bfc34f301b1a93a5ad631c36fba0598d2f569fb01c10b6ac10916e35ec"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "b617f5ff501fa3d1ab15cfacfb9d5ef2b6f0571b076552f1f1ae94d98517138d",
+    "hash": "f0922cc98aa1a442e1b20ce31e443acaa4d1df5badd7bcf73fe3d9e947b94db6",
+    "merkleRoot": "4e47c44de75a45a6c0c4f6485231d6b3214107a1c6e61af6bfe805d06d301041",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 76,
+    "timestamp": "2026-08-19T06:07:20.304Z",
+    "transactions": [
+      {
+        "transactionId": "tx-edfcfeee0e43838d-mszow3qo",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-017",
+        "batchNumber": "10",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-19T06:07:20.304Z",
+        "dataHash": "bea5fea0f4defd993ed708a4eda4a6a0d516cb66078c501094fbad30ae8cdfcd",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "7b87f0bfc34f301b1a93a5ad631c36fba0598d2f569fb01c10b6ac10916e35ec",
+          "registeredHash": "7b87f0bfc34f301b1a93a5ad631c36fba0598d2f569fb01c10b6ac10916e35ec"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "f0922cc98aa1a442e1b20ce31e443acaa4d1df5badd7bcf73fe3d9e947b94db6",
+    "hash": "20e62d4363553ae8cef5b14a17158bb0e83807fb56b361a97ff7d9302b9544ef",
+    "merkleRoot": "f630ec6737f151d3bbb35a82e6cd2c2031d88caaf94b0d862e0926cf624c3deb",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 77,
+    "timestamp": "2026-08-19T06:18:56.201Z",
+    "transactions": [
+      {
+        "transactionId": "tx-5cc43a27f149450f-mszpb0p5",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-017",
+        "batchNumber": "10",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-19T06:18:56.201Z",
+        "dataHash": "bad322d2c2b2b10a3cd162c036dbac9debac94a12bdf491568554a1d7b81982e",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "7b87f0bfc34f301b1a93a5ad631c36fba0598d2f569fb01c10b6ac10916e35ec",
+          "registeredHash": "7b87f0bfc34f301b1a93a5ad631c36fba0598d2f569fb01c10b6ac10916e35ec"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "20e62d4363553ae8cef5b14a17158bb0e83807fb56b361a97ff7d9302b9544ef",
+    "hash": "02403517d41f50f7eea95a9dfd14fb632052103a62ed5148aae1d131290e8dab",
+    "merkleRoot": "89b7db82358c9efc2c94f700670102aff84bb5b70583d8e31c24c1c285ac6ab2",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 78,
+    "timestamp": "2026-08-19T06:18:56.239Z",
+    "transactions": [
+      {
+        "transactionId": "tx-2f48db1685b236ae-mszpb0q7",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-017",
+        "batchNumber": "10",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-19T06:18:56.239Z",
+        "dataHash": "8b2439d661367e07d0c50d0db0c0c85c22116c1391d2ad56d775e54178a226f0",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "7b87f0bfc34f301b1a93a5ad631c36fba0598d2f569fb01c10b6ac10916e35ec",
+          "registeredHash": "7b87f0bfc34f301b1a93a5ad631c36fba0598d2f569fb01c10b6ac10916e35ec"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "02403517d41f50f7eea95a9dfd14fb632052103a62ed5148aae1d131290e8dab",
+    "hash": "d5bfccd1abf3c3d26a1647e1b86fbad031aa831513183a06c07b7ceddbe6f2e3",
+    "merkleRoot": "cd7a76fcd770142312712fc9a32c649596e1cdcddc269d9768313193f832d40e",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 79,
+    "timestamp": "2026-08-19T06:19:11.680Z",
+    "transactions": [
+      {
+        "transactionId": "tx-bfa25d336c0ed9d0-mszpbcn4",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-017",
+        "batchNumber": "10",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-19T06:19:11.680Z",
+        "dataHash": "8506d6933742c61443f577fb902c38ac6c53815e4b1d15968b8798b65133e0ec",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "7b87f0bfc34f301b1a93a5ad631c36fba0598d2f569fb01c10b6ac10916e35ec",
+          "registeredHash": "7b87f0bfc34f301b1a93a5ad631c36fba0598d2f569fb01c10b6ac10916e35ec"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "d5bfccd1abf3c3d26a1647e1b86fbad031aa831513183a06c07b7ceddbe6f2e3",
+    "hash": "f74d0ddea8e3fb15e2de05c84b702e6ffa76b3d8260a52fee7658aaebdba8c2b",
+    "merkleRoot": "885221473bb3d799c1ef1c6fca32d740becf10a534ea3b82d5cc888e62e8c3e4",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 80,
+    "timestamp": "2026-08-19T06:19:11.716Z",
+    "transactions": [
+      {
+        "transactionId": "tx-ce60d51af5950619-mszpbco4",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2024-017",
+        "batchNumber": "10",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-08-19T06:19:11.715Z",
+        "dataHash": "6f0c80d946f93f8fe832efbae947a84ca4252511b5d03ffbdbeaef1980a2597e",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "7b87f0bfc34f301b1a93a5ad631c36fba0598d2f569fb01c10b6ac10916e35ec",
+          "registeredHash": "7b87f0bfc34f301b1a93a5ad631c36fba0598d2f569fb01c10b6ac10916e35ec"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "f74d0ddea8e3fb15e2de05c84b702e6ffa76b3d8260a52fee7658aaebdba8c2b",
+    "hash": "93ad6956d6c3f68bd630b5ae8a83e1e2ff22e5b82977d92d861c82122859311c",
+    "merkleRoot": "6160eb146b9f342b39cb31bee7c1fe0d861abf9f9ebe1955ca555382f7b36f68",
+    "validator": "validator-admin"
+  }
+]
