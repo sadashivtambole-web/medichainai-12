@@ -1,20 +1,45 @@
 import { useState } from "react";
 import { ImageOff } from "lucide-react";
 
-/* ── Backend base URL from Vite env (falls back to port 5050) ── */
-const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5050/api")
-  .replace(/\/api$/, ""); // strip /api suffix → http://localhost:5050
+/* ── Derive backend origin dynamically from VITE_API_URL (defaults to http://localhost:5000 per spec) ── */
+export function getBackendImageHost() {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl && typeof envUrl === "string") {
+    if (envUrl.startsWith("http://") || envUrl.startsWith("https://")) {
+      try {
+        return new URL(envUrl).origin;
+      } catch {
+        return envUrl.replace(/\/api\/?$/, "");
+      }
+    }
+    // If relative like "/api", in browser use window.location.origin
+    if (typeof window !== "undefined" && window.location?.origin) {
+      return window.location.origin;
+    }
+  }
+  // Default backend host per project specification when VITE_API_URL is unset
+  return "http://localhost:5000";
+}
 
 /**
  * Resolves a stored medicineImage path (e.g. "/uploads/foo.png") to a full URL.
+ * Preserves valid absolute URLs, data/blob URLs, and resolves relative paths cleanly.
  */
 export function resolveMedicineImageUrl(medicineImage) {
-  if (!medicineImage) return null;
-  if (medicineImage.startsWith("http://") || medicineImage.startsWith("https://")) {
-    return medicineImage;
+  if (!medicineImage || typeof medicineImage !== "string") return null;
+  const trimmed = medicineImage.trim();
+  if (!trimmed) return null;
+  if (
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("data:") ||
+    trimmed.startsWith("blob:")
+  ) {
+    return trimmed;
   }
-  const path = medicineImage.startsWith("/") ? medicineImage : `/${medicineImage}`;
-  return `${API_BASE}${path}`;
+  const host = getBackendImageHost();
+  const path = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+  return host ? `${host}${path}` : path;
 }
 
 /**

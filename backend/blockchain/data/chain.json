@@ -7449,5 +7449,366 @@
     "hash": "c8c2ea24eb823c6857cbd62ac9890f7e290a69d999ce7b3c21e3740a5f49a886",
     "merkleRoot": "976b0a199fb496cf4e1aa22d9439c769035f5e1d07a1398d4f8aaf272a318e59",
     "validator": "validator-admin"
+  },
+  {
+    "index": 269,
+    "timestamp": "2026-10-27T18:37:30.364Z",
+    "transactions": [
+      {
+        "transactionId": "tx-e49df4b66f430bf9-mvr12lq4",
+        "type": "MEDICINE_REGISTERED",
+        "medicineId": "MED-2026-12LMU34",
+        "batchNumber": "BT-P11-177913",
+        "from": null,
+        "to": "Test Manufacturer 177913 Corp",
+        "timestamp": "2026-10-27T18:37:30.364Z",
+        "dataHash": "e89a16116e87e4c42bb3d54b5fee72965e90475120c12b0bf621bfe28e0222b4",
+        "metadata": {
+          "medicineName": "Amoxil P11 177913",
+          "manufacturerCode": "",
+          "manufacturerName": "Test Manufacturer 177913 Corp",
+          "manufacturingDate": "2025-01-01",
+          "expiryDate": "2027-01-01",
+          "role": "Manufacturer"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "c8c2ea24eb823c6857cbd62ac9890f7e290a69d999ce7b3c21e3740a5f49a886",
+    "hash": "5db625dcb57a8e78aa8d5d1aeeed013a33c1778cc0a3bb0226ca03ef8fd6c669",
+    "merkleRoot": "9191c82cb92d284b29b2eeeb15a52617436e7c16b984642dbf41629b50dea1d6",
+    "validator": "validator-authority-root"
+  },
+  {
+    "index": 270,
+    "timestamp": "2026-10-27T18:37:30.583Z",
+    "transactions": [
+      {
+        "transactionId": "tx-1e4539cb84328d0f-mvr12lw7",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2026-12LMU34",
+        "batchNumber": "BT-P11-177913",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-10-27T18:37:30.583Z",
+        "dataHash": "e288a4295f3c3d488edb48d4ac49da132541b13c6e4697041869f83f31df0ab5",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "e89a16116e87e4c42bb3d54b5fee72965e90475120c12b0bf621bfe28e0222b4",
+          "registeredHash": "e89a16116e87e4c42bb3d54b5fee72965e90475120c12b0bf621bfe28e0222b4"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "5db625dcb57a8e78aa8d5d1aeeed013a33c1778cc0a3bb0226ca03ef8fd6c669",
+    "hash": "98cd8d85c4b63a0af3e07d3ac8dd21171c6faeed64ad83b24a9157de8faf113c",
+    "merkleRoot": "830e7e02413fd3463ca0cd6d3ec3efaab0bcab18d706f1b58166c31d8139251e",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 271,
+    "timestamp": "2026-10-27T18:40:34.244Z",
+    "transactions": [
+      {
+        "transactionId": "tx-5a17240fd8b76865-mvr16jlw",
+        "type": "MEDICINE_REGISTERED",
+        "medicineId": "MED-2026-16JI920",
+        "batchNumber": "BT-P11-372552",
+        "from": null,
+        "to": "Test Manufacturer 372552 Corp",
+        "timestamp": "2026-10-27T18:40:34.244Z",
+        "dataHash": "a57220c4ce42f487bc451eea92f772bc0b4ad8a77cd6cfa03e6876e01bfcae38",
+        "metadata": {
+          "medicineName": "Amoxil P11 372552",
+          "manufacturerCode": "",
+          "manufacturerName": "Test Manufacturer 372552 Corp",
+          "manufacturingDate": "2025-01-01",
+          "expiryDate": "2027-01-01",
+          "role": "Manufacturer"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "98cd8d85c4b63a0af3e07d3ac8dd21171c6faeed64ad83b24a9157de8faf113c",
+    "hash": "d5aa067502da198852bffa9635e29b856365957b67e47ca10839b289830e1582",
+    "merkleRoot": "949ebe058ed613b8cf62f74210663d4bcf535815253c2b616b74e64eebc9fdbb",
+    "validator": "validator-authority-root"
+  },
+  {
+    "index": 272,
+    "timestamp": "2026-10-27T18:40:34.347Z",
+    "transactions": [
+      {
+        "transactionId": "tx-44f58479248a21c9-mvr16jor",
+        "type": "MEDICINE_TRANSFERRED",
+        "medicineId": "MED-2026-16JI920",
+        "batchNumber": "BT-P11-372552",
+        "from": "Test Manufacturer 372552 Corp",
+        "to": "Test Distributor 372552B Corp",
+        "timestamp": "2026-10-27T18:40:34.347Z",
+        "dataHash": "63feec749c93d99e8ec6745bab6e3a551db41c7413c8053ab2c88f5e2e6857bf",
+        "metadata": {
+          "fromRole": "Manufacturer",
+          "toRole": "Distributor",
+          "action": "TRANSFER_DISPATCHED"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "d5aa067502da198852bffa9635e29b856365957b67e47ca10839b289830e1582",
+    "hash": "c575f61394c5c13dc0081df7ac028933451a10b6b8c48909b0547ff6267bd7fc",
+    "merkleRoot": "3be0ab336ba75a028a68a16fb4e215bb0ddd4db273e75a5302731695cffd12e0",
+    "validator": "validator-distributor"
+  },
+  {
+    "index": 273,
+    "timestamp": "2026-10-27T18:40:34.555Z",
+    "transactions": [
+      {
+        "transactionId": "tx-b52ac963c952dd14-mvr16juj",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2026-16JI920",
+        "batchNumber": "BT-P11-372552",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-10-27T18:40:34.555Z",
+        "dataHash": "551577fccd14887307d17e1afcc8fb791afff715e7a252c95f7ba1be3d03853c",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "a57220c4ce42f487bc451eea92f772bc0b4ad8a77cd6cfa03e6876e01bfcae38",
+          "registeredHash": "a57220c4ce42f487bc451eea92f772bc0b4ad8a77cd6cfa03e6876e01bfcae38"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "c575f61394c5c13dc0081df7ac028933451a10b6b8c48909b0547ff6267bd7fc",
+    "hash": "cf5d780324b07937536e3dfd3dc42199e1784e53afb26b77ee69035c8e8ad7cb",
+    "merkleRoot": "3b0b324f0c12508637c46de7502b2be48fe215c774b0880aa6503e1eec09d0d1",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 274,
+    "timestamp": "2026-10-27T18:42:34.707Z",
+    "transactions": [
+      {
+        "transactionId": "tx-8bba418b7dd8df81-mvr194k3",
+        "type": "MEDICINE_REGISTERED",
+        "medicineId": "MED-2026-194HJ17",
+        "batchNumber": "BT-P11-492153",
+        "from": null,
+        "to": "Test Manufacturer 492153 Corp",
+        "timestamp": "2026-10-27T18:42:34.707Z",
+        "dataHash": "9a7edb10dc9b50883800acd333f1ce77948631d146cbeaf5ab1d1f50824950fc",
+        "metadata": {
+          "medicineName": "Amoxil P11 492153",
+          "manufacturerCode": "",
+          "manufacturerName": "Test Manufacturer 492153 Corp",
+          "manufacturingDate": "2025-01-01",
+          "expiryDate": "2027-01-01",
+          "role": "Manufacturer"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "cf5d780324b07937536e3dfd3dc42199e1784e53afb26b77ee69035c8e8ad7cb",
+    "hash": "045c26512889826cba7c0c78e37b679f8006b9d88ee56e1f5b1b12f569644657",
+    "merkleRoot": "d2fd77bb85dee735b9c4d255af89cfc05768d662de2060cbe8d8c36907629abc",
+    "validator": "validator-authority-root"
+  },
+  {
+    "index": 275,
+    "timestamp": "2026-10-27T18:44:17.372Z",
+    "transactions": [
+      {
+        "transactionId": "tx-016295b7501ea8b9-mvr1bbrw",
+        "type": "MEDICINE_REGISTERED",
+        "medicineId": "MED-2026-1BBPS05",
+        "batchNumber": "BT-P11-597739",
+        "from": null,
+        "to": "Test Manufacturer 597739 Corp",
+        "timestamp": "2026-10-27T18:44:17.372Z",
+        "dataHash": "1428599d936f696194c6837f682382851fc134014e8d16660a324f9ce67d0b4d",
+        "metadata": {
+          "medicineName": "Amoxil P11 597739",
+          "manufacturerCode": "",
+          "manufacturerName": "Test Manufacturer 597739 Corp",
+          "manufacturingDate": "2025-01-01",
+          "expiryDate": "2027-01-01",
+          "role": "Manufacturer"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "045c26512889826cba7c0c78e37b679f8006b9d88ee56e1f5b1b12f569644657",
+    "hash": "9b928f0220f4d07a318407f7880da35c718526f0b2bee5698723956f8e640dab",
+    "merkleRoot": "c69d4d4202584e2c5c097cdc6ca5ca5ce2621b7464330b5dab54afd0b77d5c61",
+    "validator": "validator-authority-root"
+  },
+  {
+    "index": 276,
+    "timestamp": "2026-10-27T18:44:17.545Z",
+    "transactions": [
+      {
+        "transactionId": "tx-3a2dca0e40024f2a-mvr1bbwp",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2026-1BBPS05",
+        "batchNumber": "BT-P11-597739",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-10-27T18:44:17.545Z",
+        "dataHash": "808d59a3c8a359e679a111bb7d580bcb66fddb19bf7270016f6b286daf9dd6f1",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "1428599d936f696194c6837f682382851fc134014e8d16660a324f9ce67d0b4d",
+          "registeredHash": "1428599d936f696194c6837f682382851fc134014e8d16660a324f9ce67d0b4d"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "9b928f0220f4d07a318407f7880da35c718526f0b2bee5698723956f8e640dab",
+    "hash": "136716a5b9f5fa3c5d2fbe36b96de9103147ac8157223e104380abf4dbece26e",
+    "merkleRoot": "2db1beecbe1f44cb2552e0dc56104f62bd91ede23d764c6373cb4c0afe5c4004",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 277,
+    "timestamp": "2026-10-27T18:48:35.268Z",
+    "transactions": [
+      {
+        "transactionId": "tx-f5569f96efb916e0-mvr1guro",
+        "type": "MEDICINE_REGISTERED",
+        "medicineId": "MED-2026-1GUMH26",
+        "batchNumber": "BT-P11-846894",
+        "from": null,
+        "to": "Test Manufacturer 846894 Corp",
+        "timestamp": "2026-10-27T18:48:35.268Z",
+        "dataHash": "c27d64c9ecfaa8851061fc42b3120e019b6220ab2239c18490f94dbd10a814b6",
+        "metadata": {
+          "medicineName": "Amoxil P11 846894",
+          "manufacturerCode": "",
+          "manufacturerName": "Test Manufacturer 846894 Corp",
+          "manufacturingDate": "2025-01-01",
+          "expiryDate": "2027-01-01",
+          "role": "Manufacturer"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "136716a5b9f5fa3c5d2fbe36b96de9103147ac8157223e104380abf4dbece26e",
+    "hash": "ac95ce60f7ea9668d0f5c8798b6cf6b3d6479d76ceef508634b22b86aeaa692e",
+    "merkleRoot": "1db4869432fdb533d5c896558904ceaed647a2b3c5aaf9bac7c787fd9aa057c6",
+    "validator": "validator-authority-root"
+  },
+  {
+    "index": 278,
+    "timestamp": "2026-10-27T18:48:35.415Z",
+    "transactions": [
+      {
+        "transactionId": "tx-40b0cab2d49f8b05-mvr1guvr",
+        "type": "MEDICINE_TRANSFERRED",
+        "medicineId": "MED-2026-1GUMH26",
+        "batchNumber": "BT-P11-846894",
+        "from": "Test Manufacturer 846894 Corp",
+        "to": "Test Distributor 846894A Corp",
+        "timestamp": "2026-10-27T18:48:35.414Z",
+        "dataHash": "6426b7ead9fa3e7f1a2e24119217dfb2d35156788e55049c7f947ba423c8cf72",
+        "metadata": {
+          "fromRole": "Manufacturer",
+          "toRole": "Distributor",
+          "action": "TRANSFER_DISPATCHED"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "ac95ce60f7ea9668d0f5c8798b6cf6b3d6479d76ceef508634b22b86aeaa692e",
+    "hash": "75c272766183cff824f6897f29ede673591013f6049ccb7082e0131da37c6adc",
+    "merkleRoot": "1f5127bd05dbf4dcef2e9c8c7c42c7a0a12c4c94d5095a1e656e9c545f5fc028",
+    "validator": "validator-distributor"
+  },
+  {
+    "index": 279,
+    "timestamp": "2026-10-27T18:48:35.555Z",
+    "transactions": [
+      {
+        "transactionId": "tx-06f59bcd1b2e18fc-mvr1guzn",
+        "type": "MEDICINE_TRANSFERRED",
+        "medicineId": "MED-2026-1GUMH26",
+        "batchNumber": "BT-P11-846894",
+        "from": "Test Distributor 846894A Corp",
+        "to": "Test Pharmacy 846894A Corp",
+        "timestamp": "2026-10-27T18:48:35.555Z",
+        "dataHash": "3091e28cd0948dad4dd3072bdbb5891ead9d931d5aa3da85613fdb6f8f0bdfd4",
+        "metadata": {
+          "fromRole": "Distributor",
+          "toRole": "Pharmacy",
+          "action": "TRANSFER_DISPATCHED"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "75c272766183cff824f6897f29ede673591013f6049ccb7082e0131da37c6adc",
+    "hash": "1e7f28100fd415541e9474fa737b8ce23e2b2701aeab09ad96f465c574985900",
+    "merkleRoot": "01877b324b4522ed75656b83b6bc909bf7cefcb9ab651d3d95318abcc8e25fcb",
+    "validator": "validator-pharmacy"
+  },
+  {
+    "index": 280,
+    "timestamp": "2026-10-27T18:48:35.736Z",
+    "transactions": [
+      {
+        "transactionId": "tx-2ac0dcb79a09f6df-mvr1gv4o",
+        "type": "RECEIPT_CONFIRMED",
+        "medicineId": "MED-2026-1GUMH26",
+        "batchNumber": "BT-P11-846894",
+        "from": "Test Pharmacy 846894A Corp",
+        "to": "Test Pharmacy 846894A Corp",
+        "timestamp": "2026-10-27T18:48:35.736Z",
+        "dataHash": "430f3c7669d1d45b0d0cb2179bbe234241c374ef3ae6ee69807202941fc76cb1",
+        "metadata": {
+          "actor": "Test Pharmacy 846894A Corp",
+          "role": "Pharmacy",
+          "action": "CUSTODY_CONFIRMED"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "1e7f28100fd415541e9474fa737b8ce23e2b2701aeab09ad96f465c574985900",
+    "hash": "abefbdeec3eec0a1930cb93078d902daf39e47fe4f1db7ce0b4d12fb68dfa7a2",
+    "merkleRoot": "12323dc88fd43b5bc684285f0abe3673bd62973c0ed1169359ef2893bd00f501",
+    "validator": "validator-pharmacy"
+  },
+  {
+    "index": 281,
+    "timestamp": "2026-10-27T18:48:36.020Z",
+    "transactions": [
+      {
+        "transactionId": "tx-955d63c9a7b34d9e-mvr1gvck",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2026-1GUMH26",
+        "batchNumber": "BT-P11-846894",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-10-27T18:48:36.020Z",
+        "dataHash": "677b805dad6067e62e07c01655059261fbcac036bb52a839ce4f418af4802320",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "c27d64c9ecfaa8851061fc42b3120e019b6220ab2239c18490f94dbd10a814b6",
+          "registeredHash": "c27d64c9ecfaa8851061fc42b3120e019b6220ab2239c18490f94dbd10a814b6"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "abefbdeec3eec0a1930cb93078d902daf39e47fe4f1db7ce0b4d12fb68dfa7a2",
+    "hash": "d6b8d80c04936b53ada9ef503c3a60dd92d3ef5b1c090e5429548e19d2d83001",
+    "merkleRoot": "cdfb8f40fd8029f8718d9baf56cb302bca5be98b21ff4de9c31ac272a36db7b8",
+    "validator": "validator-admin"
   }
 ]

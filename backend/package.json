@@ -7,12 +7,13 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch-path=server.js --watch-path=routes.js --watch-path=models.js --watch-path=middleware.js --watch-path=blockchain.js --watch-path=services --watch-path=validators --watch-path=utils server.js",
-    "test": "node test-drugchain.js && node test-verification-engine.js && node test-ai-module.js && node test-frontend-integration.js && node test-part5-master-audit.js",
+    "test": "node test-drugchain.js && node test-verification-engine.js && node test-ai-module.js && node test-frontend-integration.js && node test-part5-master-audit.js && node test-phase11-master-audit.js",
     "test:blockchain": "node test-drugchain.js",
     "test:verification": "node test-verification-engine.js",
     "test:ai": "node test-ai-module.js",
     "test:integration": "node test-frontend-integration.js",
-    "test:master": "node test-part5-master-audit.js"
+    "test:master": "node test-part5-master-audit.js",
+    "test:phase11": "node test-phase11-master-audit.js"
   },
   "dependencies": {
     "axios": "^1.7.9",

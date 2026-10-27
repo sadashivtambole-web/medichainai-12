@@ -81,15 +81,21 @@ export const schemas = {
 
   registerMedicine: Joi.object({
     manufacturerName: Joi.string().trim().max(200).allow(""),
-    companyName: Joi.string().trim().max(200).required(),
+    companyName: Joi.string().trim().max(200).allow(""),
+    company: Joi.string().trim().max(200).allow(""),
+    manufacturer: Joi.string().trim().max(200).allow(""),
     manufacturerCode: Joi.string().trim().max(100).allow(""),
-    medicineName: Joi.string().trim().max(200).required(),
-    batchNumber: Joi.string().trim().max(100).required(),
+    medicineName: Joi.string().trim().max(200).allow(""),
+    name: Joi.string().trim().max(200).allow(""),
+    batchNumber: Joi.string().trim().max(100).allow(""),
+    batchId: Joi.string().trim().max(100).allow(""),
     manufacturingDate: Joi.string().required(),
     expiryDate: Joi.string().required(),
     price: Joi.string().trim().max(50).allow(""),
-    quantity: Joi.number().integer().min(1).max(10000000),
+    quantity: Joi.number().integer().min(1).max(10000000).optional(),
     composition: Joi.string().trim().max(1000).allow(""),
+    medicineImage: Joi.string().allow("").optional(),
+    governmentCertificate: Joi.string().allow("").optional(),
   }).unknown(true), // allow multer file fields
 
   rejectMedicine: Joi.object({

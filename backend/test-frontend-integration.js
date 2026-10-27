@@ -3,7 +3,8 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const API = "http://localhost:5000/api";
+const PORT = process.env.PORT || 5000;
+const API = process.env.VITE_API_URL || `http://localhost:${PORT}/api`;
 const CREATOR_EMAIL = process.env.CREATOR_EMAIL || "sadashivtambole@gmail.com";
 const CREATOR_PASSWORD = process.env.CREATOR_PASSWORD || "Shiva@123";
 

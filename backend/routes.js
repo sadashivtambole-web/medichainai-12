@@ -67,6 +67,7 @@ import {
   generateSecureQRToken,
   parseAndVerifyQRToken,
   processAIAndOCR,
+  escapeRegex,
 } from "./services/verificationEngine.js";
 import { aiService } from "./services/ai/ai.service.js";
 
@@ -2660,12 +2661,12 @@ router.post(
   validate(schemas.registerMedicine),
   async (req, res) => {
     try {
+      const effectiveMedicineName = (req.body.medicineName || req.body.name || "").trim();
+      const effectiveBatchNumber = (req.body.batchNumber || req.body.batchId || "").trim();
+      const effectiveCompanyName = (req.body.companyName || req.body.company || req.body.manufacturer || "").trim();
+      const effectiveManufacturerName = (req.body.manufacturerName || req.body.manufacturer || effectiveCompanyName).trim();
       const {
-        manufacturerName,
-        companyName,
         manufacturerCode,
-        medicineName,
-        batchNumber,
         manufacturingDate,
         expiryDate,
         price,
@@ -2673,7 +2674,7 @@ router.post(
         composition,
       } = req.body;
 
-      if (!medicineName || !batchNumber || !companyName || !manufacturingDate || !expiryDate) {
+      if (!effectiveMedicineName || !effectiveBatchNumber || !effectiveCompanyName || !manufacturingDate || !expiryDate) {
         return sendError(res, "Missing required medicine registration fields", "MISSING_FIELDS", 400);
       }
 
@@ -2681,13 +2682,13 @@ router.post(
         return sendError(res, "Expiry date must be after manufacturing date", "INVALID_DATES", 400);
       }
 
-      const batchId = batchNumber.trim().toUpperCase();
+      const batchId = effectiveBatchNumber.toUpperCase();
 
       // ── STEP 1: Check MongoDB for existing record by batchId ────────────
       const existingInDB = await Medicine.findOne({ batchId });
       if (existingInDB) {
         const chainHistory = drugChainService.getMedicineHistory(existingInDB.id) || [];
-        return res.status(200).json({
+        return res.status(409).json({
           success: false,
           code: "ALREADY_REGISTERED",
           alreadyRegistered: true,
@@ -2707,12 +2708,12 @@ router.post(
         const syncedMed = new Medicine({
           id: syncedId,
           batchId,
-          name: chainExisting.metadata?.medicineName || medicineName.trim(),
-          medicineName: chainExisting.metadata?.medicineName || medicineName.trim(),
+          name: chainExisting.metadata?.medicineName || effectiveMedicineName,
+          medicineName: chainExisting.metadata?.medicineName || effectiveMedicineName,
           manufacturerId: req.user._id,
-          manufacturer: chainExisting.metadata?.manufacturerName || companyName.trim(),
-          manufacturerName: chainExisting.metadata?.manufacturerName || manufacturerName?.trim() || "",
-          company: companyName.trim(),
+          manufacturer: chainExisting.metadata?.manufacturerName || effectiveCompanyName,
+          manufacturerName: chainExisting.metadata?.manufacturerName || effectiveManufacturerName || "",
+          company: effectiveCompanyName,
           manufacturerCode: chainExisting.metadata?.manufacturerCode || manufacturerCode?.trim() || "",
           manufacturingDate: chainExisting.metadata?.manufacturingDate || manufacturingDate,
           expiryDate: chainExisting.metadata?.expiryDate || expiryDate,
@@ -2777,10 +2778,10 @@ router.post(
 
       const medicineImage = req.files?.medicineImage?.[0]
         ? `/uploads/${req.files.medicineImage[0].filename}`
-        : null;
+        : (req.body.medicineImage || null);
       const governmentCertificate = req.files?.governmentCertificate?.[0]
         ? `/uploads/${req.files.governmentCertificate[0].filename}`
-        : null;
+        : (req.body.governmentCertificate || null);
 
       const isCreator = req.user.role === "Creator";
 
@@ -2790,8 +2791,8 @@ router.post(
           {
             id: medicineId,
             batchId,
-            name: medicineName.trim(),
-            manufacturer: companyName.trim(),
+            name: effectiveMedicineName,
+            manufacturer: effectiveCompanyName,
             manufacturerCode: manufacturerCode?.trim() || "",
             manufacturingDate,
             expiryDate,
@@ -2802,12 +2803,12 @@ router.post(
         const newMedicine = new Medicine({
           id: medicineId,
           batchId,
-          name: medicineName.trim(),
-          medicineName: medicineName.trim(),
+          name: effectiveMedicineName,
+          medicineName: effectiveMedicineName,
           manufacturerId: req.user._id,
-          manufacturer: manufacturerName?.trim() || companyName?.trim(),
-          manufacturerName: manufacturerName?.trim() || "",
-          company: companyName.trim(),
+          manufacturer: effectiveManufacturerName || effectiveCompanyName,
+          manufacturerName: effectiveManufacturerName || "",
+          company: effectiveCompanyName,
           manufacturerCode: manufacturerCode?.trim() || "",
           manufacturingDate,
           expiryDate,
@@ -2856,7 +2857,7 @@ router.post(
             batchId,
             fromUserId: req.user._id,
             fromRole: "Manufacturer",
-            from: companyName.trim(),
+            from: effectiveCompanyName,
             toRole: "Distributor",
             toUserId: link ? link.toUserId : null,
             to: link ? link.toCompanyName : "Pending Assignment",
@@ -2876,7 +2877,7 @@ router.post(
       const precalculatedHash = calculateMedicineDataHash({
         medicineId,
         batchNumber: batchId,
-        medicineName: medicineName.trim(),
+        medicineName: effectiveMedicineName,
         manufacturerCode: manufacturerCode?.trim() || "",
         manufacturingDate,
         expiryDate,
@@ -2885,12 +2886,12 @@ router.post(
       const newMedicine = new Medicine({
         id: medicineId,
         batchId,
-        name: medicineName.trim(),
-        medicineName: medicineName.trim(),
+        name: effectiveMedicineName,
+        medicineName: effectiveMedicineName,
         manufacturerId: req.user._id,
-        manufacturer: manufacturerName?.trim() || companyName?.trim(),
-        manufacturerName: manufacturerName?.trim() || "",
-        company: companyName.trim(),
+        manufacturer: effectiveManufacturerName || effectiveCompanyName,
+        manufacturerName: effectiveManufacturerName || "",
+        company: effectiveCompanyName,
         manufacturerCode: manufacturerCode?.trim() || "",
         manufacturingDate,
         expiryDate,
@@ -2912,7 +2913,7 @@ router.post(
           {
             step: 1,
             role: "Manufacturer",
-            actor: companyName.trim(),
+            actor: effectiveCompanyName,
             timestamp: new Date().toLocaleString("en-IN"),
             status: "Submitted (Pending Admin Approval)",
             txHash: null,
@@ -2929,7 +2930,7 @@ router.post(
         submittedByUser: req.user,
         relatedResourceType: "Medicine",
         relatedResourceId: medicineId,
-        data: { medicineName, batchId, batchNumber, manufacturingDate, expiryDate, price: price || "" },
+        data: { medicineName: effectiveMedicineName, batchId, batchNumber: batchId, manufacturingDate, expiryDate, price: price || "" },
       }).catch(() => {});
 
       // In-app notifications to all Admins/Creators
@@ -2939,7 +2940,7 @@ router.post(
           await Notification.create({
             userId: c._id,
             title: "New Medicine Awaiting Approval",
-            message: `Manufacturer "${companyName.trim()}" submitted medicine "${medicineName.trim()}" (Batch: ${batchId}) requiring compliance review.`,
+            message: `Manufacturer "${effectiveCompanyName}" submitted medicine "${effectiveMedicineName}" (Batch: ${batchId}) requiring compliance review.`,
             type: "APPROVAL",
           });
         }
@@ -2950,7 +2951,7 @@ router.post(
         emailService.sendMedicineSubmissionPendingEmail({
           toEmail: req.user.email,
           fullName: req.user.fullName || req.user.name,
-          medicineName: medicineName.trim(),
+          medicineName: effectiveMedicineName,
           batchNumber: batchId,
           manufacturingDate,
           expiryDate,
@@ -2963,9 +2964,9 @@ router.post(
         if (creatorUser?.email) {
           emailService.sendAdminNewMedicineNotificationEmail({
             adminEmail: creatorUser.email,
-            medicineName: medicineName.trim(),
+            medicineName: effectiveMedicineName,
             batchNumber: batchId,
-            manufacturerName: companyName.trim(),
+            manufacturerName: effectiveCompanyName,
             submittedAt: new Date(),
           }).catch((err) => logger.warn("Admin new medicine email note", { error: err.message }));
         }
@@ -2982,7 +2983,7 @@ router.post(
           resourceId: medicineId,
           ipAddress: req.ip || "127.0.0.1",
           result: "SUCCESS",
-          details: { batchId, medicineName, approvalStatus: "pending" },
+          details: { batchId, medicineName: effectiveMedicineName, approvalStatus: "pending" },
         });
       } catch (auditErr) {}
 
@@ -3015,39 +3016,64 @@ router.get("/medicines", verifyToken, requireRole("Manufacturer", "Distributor",
       }
     } else if (role === "manufacturer") {
       // Manufacturer ONLY sees medicines they created or own (all approval statuses so they can track pending/rejected)
+      const safeCompany = escapeRegex(company);
       query = {
         $or: [
           { manufacturerId: req.user._id },
           { currentOwnerId: req.user._id },
-          { manufacturer: new RegExp(`^${company}$`, "i") },
-          { company: new RegExp(`^${company}$`, "i") },
+          ...(safeCompany ? [
+            { manufacturer: new RegExp(`^${safeCompany}$`, "i") },
+            { company: new RegExp(`^${safeCompany}$`, "i") },
+          ] : []),
         ],
       };
       if (req.query.approvalStatus && req.query.approvalStatus !== "all") {
         query.approvalStatus = req.query.approvalStatus.toLowerCase();
       }
     } else if (role === "distributor") {
-      // Distributor ONLY sees Admin-approved medicines
+      // Distributor ONLY sees Admin-approved medicines authorized for their organization
+      const safeCompany = escapeRegex(company);
+      const orConditions = [{ currentOwnerId: req.user._id }];
+      if (safeCompany) {
+        orConditions.push({ "transferHistory.actor": new RegExp(`^${safeCompany}$`, "i") });
+      }
+      // Also include medicines for which a transfer was addressed to this distributor
+      const userTransfers = await SupplyChainTransaction.find({
+        toRole: "Distributor",
+        $or: [
+          { toUserId: req.user._id },
+          ...(safeCompany ? [{ to: new RegExp(`^${safeCompany}$`, "i") }] : []),
+        ],
+      }).distinct("batchId");
+      if (userTransfers.length > 0) {
+        orConditions.push({ batchId: { $in: userTransfers } });
+      }
       query = {
         approvalStatus: "approved",
-        $or: [
-          { currentOwnerId: req.user._id },
-          { currentOwnerRole: "Distributor" },
-          { currentHolder: "Distributor" },
-          { "transferHistory.actor": new RegExp(company, "i") },
-        ],
+        $or: orConditions,
       };
     } else if (role === "pharmacy") {
-      // Pharmacy ONLY sees Admin-approved medicines
+      // Pharmacy ONLY sees Admin-approved medicines legitimately dispatched or transferred to them
+      const safeCompany = escapeRegex(company);
+      const orConditions = [{ currentOwnerId: req.user._id }];
+      if (safeCompany) {
+        orConditions.push({ "transferHistory.actor": new RegExp(`^${safeCompany}$`, "i") });
+        orConditions.push({ currentHolder: new RegExp(`^${safeCompany}$`, "i") });
+      }
+      // Also include medicines for which a transfer was addressed to this pharmacy
+      const pharmacyTransfers = await SupplyChainTransaction.find({
+        toRole: "Pharmacy",
+        $or: [
+          { toUserId: req.user._id },
+          ...(safeCompany ? [{ to: new RegExp(`^${safeCompany}$`, "i") }] : []),
+        ],
+      }).distinct("batchId");
+      if (pharmacyTransfers.length > 0) {
+        orConditions.push({ batchId: { $in: pharmacyTransfers } });
+      }
       query = {
         approvalStatus: "approved",
-        $or: [
-          { currentOwnerId: req.user._id },
-          { currentOwnerRole: "Pharmacy" },
-          { currentHolder: "Pharmacy Shelf" },
-          { currentHolder: new RegExp(company, "i") },
-          { "transferHistory.actor": new RegExp(company, "i") },
-        ],
+        $or: orConditions,
       };
     } else {
       return sendError(res, "Access denied. Only supply-chain partners may inspect internal medicine batches.", "FORBIDDEN", 403);
@@ -3063,10 +3089,16 @@ router.get("/medicines", verifyToken, requireRole("Manufacturer", "Distributor",
 // Single Medicine Details with Access Isolation
 router.get("/medicines/:id", verifyToken, async (req, res) => {
   try {
-    const queryId = req.params.id.trim();
-    const medicine = await Medicine.findOne({
-      $or: [{ id: new RegExp(`^${queryId}$`, "i") }, { batchId: new RegExp(`^${queryId}$`, "i") }],
-    });
+    const rawId = req.params.id.trim();
+    const safeId = escapeRegex(rawId);
+    const queryConditions = [
+      { id: new RegExp(`^${safeId}$`, "i") },
+      { batchId: new RegExp(`^${safeId}$`, "i") },
+    ];
+    if (mongoose.isValidObjectId(rawId)) {
+      queryConditions.push({ _id: rawId });
+    }
+    const medicine = await Medicine.findOne({ $or: queryConditions });
 
     if (!medicine) {
       return sendError(res, "Medicine not found", "NOT_FOUND", 404);
@@ -3075,6 +3107,7 @@ router.get("/medicines/:id", verifyToken, async (req, res) => {
     const role = (req.user.role || "").toLowerCase();
     const userProfile = req.userProfile || await getProfileForUser(req.user);
     const company = (userProfile?.companyName || userProfile?.pharmacyName || req.user.company || "").trim();
+    const safeCompany = escapeRegex(company);
 
     // 1. Creator has administrative access
     if (role === "creator") {
@@ -3089,6 +3122,7 @@ router.get("/medicines/:id", verifyToken, async (req, res) => {
     // 3. Manufacturer isolation: Only the manufacturer who owns this batch
     if (role === "manufacturer") {
       const isOwner = (medicine.manufacturerId && medicine.manufacturerId.toString() === req.user._id.toString()) ||
+        (medicine.currentOwnerId && medicine.currentOwnerId.toString() === req.user._id.toString()) ||
         (company && (medicine.company.toLowerCase() === company.toLowerCase() || medicine.manufacturer.toLowerCase() === company.toLowerCase()));
       if (!isOwner) {
         return sendError(res, "Access denied: You are not authorized to view medicines belonging to other manufacturers.", "FORBIDDEN", 403);
@@ -3101,11 +3135,14 @@ router.get("/medicines/:id", verifyToken, async (req, res) => {
         return sendError(res, "Access denied: This medicine batch has not been approved by administration.", "FORBIDDEN", 403);
       }
       const hasCustody = (medicine.currentOwnerId && medicine.currentOwnerId.toString() === req.user._id.toString()) ||
-        medicine.currentHolder === "Distributor" ||
-        (medicine.transferHistory && medicine.transferHistory.some(t => t.actor.toLowerCase().includes(company.toLowerCase())));
+        (company && medicine.transferHistory && medicine.transferHistory.some(t => t.actor.toLowerCase().includes(company.toLowerCase())));
       const hasTransfer = await SupplyChainTransaction.findOne({
         batchId: medicine.batchId,
-        $or: [{ to: new RegExp(company, "i") }, { toRole: "Distributor" }],
+        toRole: "Distributor",
+        $or: [
+          { toUserId: req.user._id },
+          ...(safeCompany ? [{ to: new RegExp(`^${safeCompany}$`, "i") }] : []),
+        ],
       });
       if (!hasCustody && !hasTransfer) {
         return sendError(res, "Access denied: You are not authorized to inspect this medicine batch.", "FORBIDDEN", 403);
@@ -3118,11 +3155,14 @@ router.get("/medicines/:id", verifyToken, async (req, res) => {
         return sendError(res, "Access denied: This medicine batch has not been approved by administration.", "FORBIDDEN", 403);
       }
       const isPharmacyCustody = (medicine.currentOwnerId && medicine.currentOwnerId.toString() === req.user._id.toString()) ||
-        medicine.currentHolder.toLowerCase().includes("pharmacy") ||
-        (medicine.transferHistory && medicine.transferHistory.some(t => t.actor.toLowerCase().includes(company.toLowerCase())));
+        (company && medicine.transferHistory && medicine.transferHistory.some(t => t.actor.toLowerCase().includes(company.toLowerCase())));
       const hasTransfer = await SupplyChainTransaction.findOne({
         batchId: medicine.batchId,
-        $or: [{ to: new RegExp(company, "i") }, { toRole: "Pharmacy" }],
+        toRole: "Pharmacy",
+        $or: [
+          { toUserId: req.user._id },
+          ...(safeCompany ? [{ to: new RegExp(`^${safeCompany}$`, "i") }] : []),
+        ],
       });
       if (!isPharmacyCustody && !hasTransfer) {
         return sendError(res, "Access denied: This medicine has not been dispatched to your pharmacy.", "FORBIDDEN", 403);
@@ -3149,8 +3189,13 @@ router.get("/transfers/incoming", verifyToken, requireRole("Distributor", "Pharm
       query = {};
     } else if (role === "distributor") {
       // Scope strictly to this distributor — not all distributors
-      const orConditions = [{ toUserId: req.user._id }];
-      if (company) orConditions.push({ to: new RegExp(`^${company}$`, "i") });
+      const safeCompany = escapeRegex(company);
+      const orConditions = [
+        { toUserId: req.user._id },
+        { to: "Pending Assignment" },
+        { toUserId: null, toRole: "Distributor", action: "REGISTERED" },
+      ];
+      if (safeCompany) orConditions.push({ to: new RegExp(`^${safeCompany}$`, "i") });
       // Also show REGISTERED batches from manufacturers the distributor is linked to
       const mfrLinks = await SupplyChainLink.find({
         linkType: "MANUFACTURER_DISTRIBUTOR",
@@ -3163,8 +3208,15 @@ router.get("/transfers/incoming", verifyToken, requireRole("Distributor", "Pharm
       query = { $or: orConditions };
     } else if (role === "pharmacy") {
       // Scope strictly to this pharmacy
-      const orConditions = [{ toUserId: req.user._id }, { toRole: "Pharmacy", action: "FORWARDED" }];
-      if (company) orConditions.push({ to: new RegExp(`^${company}$`, "i") });
+      const safeCompany = escapeRegex(company);
+      const orConditions = [
+        { toUserId: req.user._id },
+        { to: "Pending Assignment" },
+        { to: "Unassigned Pharmacy" },
+      ];
+      if (safeCompany) {
+        orConditions.push({ to: new RegExp(`^${safeCompany}$`, "i") });
+      }
       query = { $or: orConditions };
     }
 
@@ -3219,6 +3271,29 @@ router.post("/transfers/:id/confirm", verifyToken, requireRole("Distributor", "C
     const userProfile = req.userProfile || await getProfileForUser(req.user);
     const actor = userProfile?.companyName || req.user.company || "ABC Distributors";
 
+    // 1. RBAC check: ensure this transfer is addressed to this distributor
+    if (req.user.role !== "Creator") {
+      const isTargetUser = transfer.toUserId && transfer.toUserId.toString() === req.user._id.toString();
+      const isTargetActor = transfer.to && actor && transfer.to.toLowerCase() === actor.toLowerCase();
+      if (transfer.toUserId && !isTargetUser && !isTargetActor) {
+        return sendError(res, "Access denied: This transfer is addressed to another distributor.", "FORBIDDEN", 403);
+      }
+    }
+
+    // 2. State check: prevent duplicate confirmation
+    if (transfer.status === "Confirmed" || transfer.action === "CONFIRMED") {
+      return sendError(res, "Transfer has already been confirmed.", "ALREADY_CONFIRMED", 400);
+    }
+
+    // 3. Approval check: ensure medicine batch is approved
+    const medicine = await Medicine.findOne({ batchId: transfer.batchId });
+    if (!medicine) {
+      return sendError(res, "Associated medicine batch not found.", "NOT_FOUND", 404);
+    }
+    if (medicine.approvalStatus !== "approved" && req.user.role !== "Creator") {
+      return sendError(res, "Cannot confirm unapproved or rejected medicine batch.", "MEDICINE_NOT_APPROVED", 400);
+    }
+
     const chainRecord = await recordTransferOnChain(transfer.id, transfer.from, actor, "Distributor", transfer.medicineId, transfer.batchId);
     const ts = new Date().toLocaleString("en-IN");
 
@@ -3249,7 +3324,7 @@ router.post("/transfers/:id/confirm", verifyToken, requireRole("Distributor", "C
         $set: {
           currentOwnerId: req.user._id,
           currentOwnerRole: "Distributor",
-          currentHolder: "Distributor",
+          currentHolder: `Distributor (${actor})`,
         },
       }
     );
@@ -3296,6 +3371,29 @@ router.post("/transfers/:id/forward", verifyToken, requireRole("Distributor", "C
     });
     if (!transfer) {
       return sendError(res, "Transfer not found", "NOT_FOUND", 404);
+    }
+
+    // 1. Approval check: ensure medicine batch is approved
+    const medicine = await Medicine.findOne({ batchId: transfer.batchId });
+    if (!medicine) {
+      return sendError(res, "Associated medicine batch not found.", "NOT_FOUND", 404);
+    }
+    if (medicine.approvalStatus !== "approved" && req.user.role !== "Creator") {
+      return sendError(res, "Cannot forward unapproved or rejected medicine batch.", "MEDICINE_NOT_APPROVED", 400);
+    }
+
+    // 2. Custody authorization: user must own or have confirmed this transfer
+    if (req.user.role !== "Creator") {
+      const isOwner = medicine.currentOwnerId && medicine.currentOwnerId.toString() === req.user._id.toString();
+      const isRecipient = transfer.toUserId && transfer.toUserId.toString() === req.user._id.toString();
+      if (!isOwner && !isRecipient) {
+        return sendError(res, "Access denied: You must be the confirmed recipient of this batch to forward it.", "FORBIDDEN", 403);
+      }
+    }
+
+    // 3. Prevent duplicate forward
+    if (transfer.action === "FORWARDED" || transfer.status === "Forwarded to Pharmacy") {
+      return sendError(res, "Transfer has already been forwarded to pharmacy.", "ALREADY_FORWARDED", 400);
     }
 
     const userProfile = req.userProfile || await getProfileForUser(req.user);
@@ -3417,9 +3515,10 @@ router.post("/transfers/:id/forward", verifyToken, requireRole("Distributor", "C
 
 router.post("/pharmacy/:medicineId/confirm", verifyToken, requireRole("Pharmacy", "Creator"), async (req, res) => {
   try {
-    const queryId = req.params.medicineId.trim();
+    const rawId = req.params.medicineId.trim();
+    const safeId = escapeRegex(rawId);
     const medicine = await Medicine.findOne({
-      $or: [{ id: new RegExp(`^${queryId}$`, "i") }, { batchId: new RegExp(`^${queryId}$`, "i") }],
+      $or: [{ id: new RegExp(`^${safeId}$`, "i") }, { batchId: new RegExp(`^${safeId}$`, "i") }],
     });
 
     if (!medicine) {
@@ -3432,6 +3531,24 @@ router.post("/pharmacy/:medicineId/confirm", verifyToken, requireRole("Pharmacy"
 
     const userProfile = req.userProfile || await getProfileForUser(req.user);
     const pharmacyActor = userProfile?.pharmacyName || userProfile?.companyName || req.user.company || "City Pharmacy (POS)";
+    const safePharmacyActor = escapeRegex(pharmacyActor);
+
+    // RBAC: Verify that this batch was dispatched to this pharmacy
+    if (req.user.role !== "Creator") {
+      const transfer = await SupplyChainTransaction.findOne({
+        batchId: medicine.batchId,
+        toRole: "Pharmacy",
+        $or: [
+          { toUserId: req.user._id },
+          ...(safePharmacyActor ? [{ to: new RegExp(`^${safePharmacyActor}$`, "i") }] : []),
+        ],
+      });
+      const isCurrentOwner = medicine.currentOwnerId && medicine.currentOwnerId.toString() === req.user._id.toString();
+      if (!transfer && !isCurrentOwner) {
+        return sendError(res, "Access denied: This medicine batch was not dispatched to your pharmacy.", "FORBIDDEN", 403);
+      }
+    }
+
     const ts = new Date().toLocaleString("en-IN");
     const chainRecord = await recordReceiptOnChain(medicine.id, medicine.batchId, pharmacyActor, "Pharmacy");
 
@@ -3445,7 +3562,7 @@ router.post("/pharmacy/:medicineId/confirm", verifyToken, requireRole("Pharmacy"
     });
     medicine.currentOwnerId = req.user._id;
     medicine.currentOwnerRole = "Pharmacy";
-    medicine.currentHolder = "Pharmacy Shelf";
+    medicine.currentHolder = `Pharmacy Shelf (${pharmacyActor})`;
     await medicine.save();
 
     // Update SupplyChainTransaction for this batch
@@ -3562,8 +3679,9 @@ router.post("/qr/verify", publicVerifyLimiter, async (req, res) => {
 router.get("/public/medicine/:code", async (req, res) => {
   try {
     const code = decodeURIComponent(req.params.code).trim();
+    const safeCode = escapeRegex(code);
     const medicine = await Medicine.findOne({
-      $or: [{ id: new RegExp(`^${code}$`, "i") }, { batchId: new RegExp(`^${code}$`, "i") }],
+      $or: [{ id: new RegExp(`^${safeCode}$`, "i") }, { batchId: new RegExp(`^${safeCode}$`, "i") }],
     });
 
     if (!medicine) return sendError(res, "Medicine not found", "NOT_FOUND", 404);
@@ -3622,9 +3740,10 @@ router.get("/blockchain/chain", async (req, res) => {
 router.get("/blockchain/medicine/:medicineId", async (req, res) => {
   try {
     const queryId = req.params.medicineId.trim();
+    const safeQueryId = escapeRegex(queryId);
     const history = drugChainService.getMedicineHistory(queryId);
     const medicine = await Medicine.findOne({
-      $or: [{ id: new RegExp(`^${queryId}$`, "i") }, { batchId: new RegExp(`^${queryId}$`, "i") }],
+      $or: [{ id: new RegExp(`^${safeQueryId}$`, "i") }, { batchId: new RegExp(`^${safeQueryId}$`, "i") }],
     });
 
     return sendSuccess(

@@ -115,16 +115,22 @@ export function parseAndVerifyQRToken(rawCode) {
   return { isValid: false, status: "INVALID_QR", lookupKey: null, isSignedToken: false };
 }
 
+export function escapeRegex(string) {
+  if (!string || typeof string !== "string") return "";
+  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 // ── 2. MEDICINE IDENTITY DATABASE LOOKUP ──
 export async function lookupMedicineIdentity(lookupKey) {
   if (!lookupKey) return { status: "NOT_FOUND", medicine: null };
 
   const cleanKey = String(lookupKey).trim();
+  const safeKey = escapeRegex(cleanKey);
   const medicine = await Medicine.findOne({
     $or: [
-      { id: new RegExp(`^${cleanKey}$`, "i") },
-      { batchId: new RegExp(`^${cleanKey}$`, "i") },
-      { name: new RegExp(`^${cleanKey}$`, "i") },
+      { id: new RegExp(`^${safeKey}$`, "i") },
+      { batchId: new RegExp(`^${safeKey}$`, "i") },
+      { name: new RegExp(`^${safeKey}$`, "i") },
     ],
   });
 

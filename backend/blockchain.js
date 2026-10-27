@@ -15,16 +15,19 @@ export { drugChainService, sha256, calculateMedicineDataHash };
 export async function getBlockchainStatus() {
   try {
     const status = drugChainService.getChainStatus();
+    const blocksCount = status.chainLength || (typeof status.latestBlock === "number" ? status.latestBlock + 1 : 1);
     return {
       status: status.valid ? "Connected" : "Warning: Chain Audit Issue",
       network: status.network || "DrugChain Private Permissioned Network",
       consensus: status.consensus || "Proof-of-Authority (PoA)",
       chainId: "DRUGCHAIN-PRIVATE-POA-01",
       blockNumber: status.latestBlock,
-      chainLength: status.chainLength,
+      totalBlocks: blocksCount,
+      chainLength: status.chainLength || blocksCount,
       latestHash: status.latestHash,
       validator: status.validator,
       valid: status.valid,
+      isValid: status.valid,
       message: status.message,
       timestamp: status.timestamp || new Date().toISOString(),
     };

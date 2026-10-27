@@ -339,8 +339,26 @@ const MedicineSchema = new mongoose.Schema(
     blockchainStatus: { type: String, default: "Pending Approval" },
     transferHistory: [TransferHistoryItemSchema],
   },
-  { timestamps: true, collection: "medicines" }
+  {
+    timestamps: true,
+    collection: "medicines",
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+  }
 );
+
+MedicineSchema.pre("save", function (next) {
+  if (this.name && !this.medicineName) {
+    this.medicineName = this.name;
+  } else if (this.medicineName && !this.name) {
+    this.name = this.medicineName;
+  }
+  next();
+});
+
+MedicineSchema.virtual("batchNumber").get(function () {
+  return this.batchId;
+});
 
 /* ══════════════════════════════════════════════════════════════════════
    4. SUPPLY CHAIN TRANSACTIONS COLLECTION
