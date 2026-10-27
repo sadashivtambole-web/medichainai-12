@@ -27,6 +27,7 @@ export default function Manufacturer() {
     companyName: user?.company || "",
     manufacturerCode: user?.companyCode || "",
     medicineName: "",
+    composition: "",
     batchNumber: "",
     manufacturingDate: "",
     expiryDate: "",
@@ -54,6 +55,10 @@ export default function Manufacturer() {
     if (step === 1) {
       if (!form.medicineName.trim()) {
         toast.error("Please enter the Tablet / Medicine Name");
+        return false;
+      }
+      if (!form.composition.trim()) {
+        toast.error("Please enter the Active Composition / Formula");
         return false;
       }
       if (!form.batchNumber.trim()) {
@@ -107,7 +112,7 @@ export default function Manufacturer() {
         aiVerification: { status: "MATCHED" },
       });
       setRegistered(result);
-      toast.success("Medicine registered successfully on blockchain & MongoDB!");
+      toast.success("Medicine submitted successfully! It is now pending Admin approval.");
     } catch (err) {
       // Handle "already registered" as an informational state, not an error
       if (err.alreadyRegistered) {
@@ -208,6 +213,24 @@ export default function Manufacturer() {
                 placeholder="e.g. ABC Tablet"
                 value={form.medicineName}
                 onChange={set("medicineName")}
+                onFocus={(e) => {
+                  e.target.style.borderColor = "#0284C7";
+                  e.target.style.boxShadow = "0 0 0 3px rgba(2,132,199,0.12)";
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = "#E2E8F0";
+                  e.target.style.boxShadow = "none";
+                }}
+              />
+            </div>
+            <div style={{ gridColumn: "1/-1" }}>
+              <label style={labelStyle}>Active Chemical Composition / Formula (Required)</label>
+              <input
+                id="composition"
+                style={inputStyle}
+                placeholder="e.g. Paracetamol IP 500mg, Caffeine 30mg"
+                value={form.composition}
+                onChange={set("composition")}
                 onFocus={(e) => {
                   e.target.style.borderColor = "#0284C7";
                   e.target.style.boxShadow = "0 0 0 3px rgba(2,132,199,0.12)";
@@ -339,6 +362,7 @@ export default function Manufacturer() {
               { label: "Company Name", value: form.companyName },
               { label: "Manufacturer Code", value: form.manufacturerCode },
               { label: "Medicine Name", value: form.medicineName },
+              { label: "Active Composition", value: form.composition },
               { label: "Batch Number", value: form.batchNumber },
               { label: "Manufacturing Date", value: form.manufacturingDate },
               { label: "Expiry Date", value: form.expiryDate },
@@ -389,7 +413,7 @@ export default function Manufacturer() {
             </div>
             <div style={{ flex: 1, padding: "12px 16px", borderRadius: 12, background: "#F0F9FF", border: "1px solid rgba(2,132,199,0.3)" }}>
               <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "#64748B", marginBottom: 4 }}>Blockchain</div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#0284C7" }}>🟢 Connected</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#0284C7" }}>🟢 Awaiting Approval</div>
             </div>
             <div style={{ flex: 1, padding: "12px 16px", borderRadius: 12, background: "#F0FDFA", border: "1px solid rgba(13,148,136,0.3)" }}>
               <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "#64748B", marginBottom: 4 }}>AI Verification</div>
@@ -413,42 +437,42 @@ export default function Manufacturer() {
               width: 72,
               height: 72,
               borderRadius: "50%",
-              background: "linear-gradient(135deg,#10B981,#059669)",
+              background: "linear-gradient(135deg,#0284C7,#0369A1)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               margin: "0 auto 24px",
-              boxShadow: "0 8px 30px rgba(16,185,129,0.3)",
+              boxShadow: "0 8px 30px rgba(2,132,199,0.3)",
             }}
           >
             <CheckCircle2 size={36} color="white" />
           </div>
           <h1 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: "2.2rem", fontWeight: 800, color: "#18182E", marginBottom: 8 }}>
-            Medicine Successfully Registered
+            Medicine Submitted for Admin Approval
           </h1>
-          <p style={{ fontSize: 15, color: "#5F607A", marginBottom: 36 }}>
-            Recorded on immutable blockchain ledger and verified in MongoDB database.
+          <p style={{ fontSize: 15, color: "#5F607A", marginBottom: 36, maxWidth: 640, margin: "0 auto 36px" }}>
+            Your medicine submission is recorded with <strong>Pending Review</strong> status. It has been transmitted to the Administrator. Once approved, it will be minted onto the DrugChain ledger and released for distributor transfers.
           </p>
 
           <div style={{ background: "#FFFFFF", border: "1px solid #E8EAF6", borderRadius: 20, padding: 32, marginBottom: 24, boxShadow: "0 4px 20px rgba(0,0,0,0.03)" }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
               {[
-                { label: "Medicine ID", value: registered.id },
+                { label: "Medicine ID", value: registered.id || registered._id },
                 { label: "Batch ID", value: registered.batchId },
-                { label: "Blockchain Tx", value: registered.blockchainTxHash },
-                { label: "Status", value: registered.blockchainStatus },
+                { label: "Approval Status", value: (registered.approvalStatus || "Pending Review").toUpperCase() },
+                { label: "DrugChain Ledger", value: registered.blockchainTxHash ? "Minted" : "Awaiting Admin Approval" },
               ].map(({ label, value }) => (
                 <div key={label} style={{ textAlign: "left", background: "#F8F9FE", border: "1px solid #E8EAF6", borderRadius: 10, padding: "12px 16px" }}>
                   <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#8E8FA8", marginBottom: 4 }}>{label}</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#18182E", fontFamily: label.includes("Tx") ? "monospace" : "inherit" }}>{value}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: label.includes("Approval Status") ? "#D97706" : "#18182E", fontFamily: label.includes("ID") ? "monospace" : "inherit" }}>{value}</div>
                 </div>
               ))}
             </div>
-            <QRDisplay medicineId={registered.id} batchId={registered.batchId} />
+            <QRDisplay medicineId={registered.id || registered._id} batchId={registered.batchId} />
           </div>
 
           {/* Uploaded Tablet Image Preview & Download */}
-          {(medicineFile || registered.medicineImage) && (
+          {(medicineFile || registered.imageUrl || registered.medicineImage) && (
             <div style={{ background: "#FFFFFF", border: "1px solid #E8EAF6", borderRadius: 20, padding: 28, marginBottom: 24, textAlign: "left", boxShadow: "0 4px 20px rgba(0,0,0,0.03)" }}>
               <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#5F607A", marginBottom: 16 }}>
                 Uploaded Medicine / Tablet Photo
@@ -461,9 +485,9 @@ export default function Manufacturer() {
                     alt="Medicine Preview"
                     style={{ width: "100%", height: 180, objectFit: "cover", borderRadius: 8, border: "1px solid #E8EAF6" }}
                   />
-                ) : registered.medicineImage ? (
+                ) : (registered.imageUrl || registered.medicineImage) ? (
                   <MedicineImage
-                    src={registered.medicineImage}
+                    src={registered.imageUrl || registered.medicineImage}
                     alt={`${registered.name || "Medicine"} packaging`}
                     style={{ height: 180 }}
                   />
@@ -676,11 +700,11 @@ export default function Manufacturer() {
               <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 {submitting ? (
                   <>
-                    <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> Registering...
+                    <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> Submitting for Approval...
                   </>
                 ) : (
                   <>
-                    <CheckCircle2 size={16} /> Register Medicine
+                    <CheckCircle2 size={16} /> Submit for Admin Approval
                   </>
                 )}
               </span>
@@ -779,9 +803,10 @@ export default function Manufacturer() {
               )
               .slice(0, 12)
               .map((m, i) => {
-                const isAuthentic = m.status === "AUTHENTIC";
-                const statusColor = isAuthentic ? "#10B981" : m.status === "SUSPICIOUS" ? "#EF4444" : "#F59E0B";
-                const statusBg = isAuthentic ? "#ECFDF5" : m.status === "SUSPICIOUS" ? "#FEF2F2" : "#FFFBEB";
+                const appStatus = m.approvalStatus || (m.status === "AUTHENTIC" ? "approved" : "pending");
+                const statusColor = appStatus === "approved" ? "#10B981" : appStatus === "rejected" ? "#EF4444" : "#F59E0B";
+                const statusBg = appStatus === "approved" ? "#ECFDF5" : appStatus === "rejected" ? "#FEF2F2" : "#FFFBEB";
+                const statusLabel = appStatus === "approved" ? "APPROVED" : appStatus === "rejected" ? "REJECTED" : "PENDING REVIEW";
                 return (
                   <div
                     key={m.id || m.batchId || i}
@@ -801,10 +826,10 @@ export default function Manufacturer() {
                     onClick={() => navigate(`/verify/${encodeURIComponent(m.batchId || m.id)}`)}
                   >
                     {/* Medicine Image Thumbnail */}
-                    {m.medicineImage && (
+                    {(m.imageUrl || m.medicineImage) && (
                       <div style={{ marginBottom: 12, borderRadius: 10, overflow: "hidden", border: "1px solid #E2E8F0" }}>
                         <MedicineImage
-                          src={m.medicineImage}
+                          src={m.imageUrl || m.medicineImage}
                           alt={m.name}
                           style={{ height: 110 }}
                           placeholderSize={110}
@@ -814,18 +839,24 @@ export default function Manufacturer() {
 
                     {/* Status badge */}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-
                       <span style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: statusColor, background: statusBg, padding: "4px 10px", borderRadius: 100, border: `1px solid ${statusColor}30` }}>
-                        {m.status || "AUTHENTIC"}
+                        {statusLabel}
                       </span>
                       <ShieldCheck size={16} color={statusColor} />
                     </div>
 
                     <h3 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 16, fontWeight: 800, color: "#0F172A", marginBottom: 8 }}>{m.name}</h3>
 
+                    {appStatus === "rejected" && m.rejectionReason && (
+                      <div style={{ marginBottom: 12, background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, padding: "8px 10px", fontSize: 11, color: "#991B1B" }}>
+                        <strong>Rejection Reason:</strong> {m.rejectionReason}
+                      </div>
+                    )}
+
                     <div style={{ display: "grid", gap: 6 }}>
                       {[
                         { label: "Batch ID", value: m.batchId },
+                        { label: "Formula", value: m.composition || "Standard" },
                         { label: "Expires", value: m.expiryDate },
                         { label: "Holder", value: m.currentHolder || "Manufacturer" },
                       ].map(row => (
@@ -837,7 +868,7 @@ export default function Manufacturer() {
                     </div>
 
                     <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid #F1F5F9", display: "flex", alignItems: "center", gap: 6, color: "#0284C7", fontSize: 12, fontWeight: 700 }}>
-                      <QrCode size={13} /> View Blockchain Record
+                      <QrCode size={13} /> View Verification Details
                     </div>
                   </div>
                 );

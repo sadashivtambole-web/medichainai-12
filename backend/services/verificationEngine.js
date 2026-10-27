@@ -390,6 +390,123 @@ export async function runFullAuthenticityAudit({ queryCode, imageFile = null, fo
     return responsePayload;
   }
 
+  // ── HANDLE PENDING APPROVAL MEDICINE STATUS ──────────────────────────
+  if (medicine.approvalStatus === "pending") {
+    return {
+      success: true,
+      status: "PENDING",
+      authenticityScore: 30,
+      isFake: false,
+      medicine: {
+        id: medicine.id,
+        batchId: medicine.batchId,
+        name: medicine.name,
+        company: medicine.company,
+        manufacturer: medicine.manufacturer,
+        manufacturingDate: medicine.manufacturingDate,
+        expiryDate: medicine.expiryDate,
+        composition: medicine.composition || "",
+        medicineImage: medicine.medicineImage,
+        imageUrl: medicine.medicineImage,
+        approvalStatus: "pending",
+        status: "PENDING APPROVAL",
+        blockchainStatus: "Pending Approval",
+      },
+      result: {
+        score: 30,
+        status: "PENDING",
+        riskLevel: "MEDIUM",
+        code: "PENDING_APPROVAL",
+      },
+      checks: {
+        qr: { status: qrAudit.isValid ? "VERIFIED" : "RAW_CODE", score: 10 },
+        database: { status: "REGISTERED_PENDING_APPROVAL", score: 15 },
+        ocr: { status: "UNAVAILABLE", score: 0 },
+        blockchain: { status: "PENDING_ADMIN_APPROVAL", score: 0 },
+        supplyChain: { status: "NOT_DISPATCHED_PENDING_APPROVAL", score: 5 },
+        expiry: { status: "VALID", score: 0 },
+        ai: { status: "UNAVAILABLE", confidence: 0, score: 0 },
+        qrReuseRisk: { status: "LOW", score: 0 },
+      },
+      layers: {
+        qr: qrAudit.isValid ? "VERIFIED" : "VALID",
+        database: "REGISTERED_PENDING_APPROVAL",
+        integrity: "PENDING_APPROVAL",
+        blockchain: "PENDING_ADMIN_APPROVAL",
+        expiry: "VALID",
+        supplyChain: "NOT_DISPATCHED_PENDING_APPROVAL",
+        qrReuseRisk: "LOW",
+      },
+      reasons: [
+        "⏳ PENDING COMPLIANCE APPROVAL: This medicine batch has been submitted by the registered manufacturer but is currently awaiting Admin compliance approval.",
+        "⚠️ Unreleased Batch: This medicine has not yet been approved or released into the authorized distribution network.",
+        "ℹ️ Cryptographic verification on DrugChain will only activate after official Admin review.",
+      ],
+      warnings: [
+        "This batch is PENDING approval. It should not be distributed, sold, or purchased until approved by regulatory administrators.",
+      ],
+    };
+  }
+
+  // ── HANDLE REJECTED MEDICINE STATUS ──────────────────────────────────
+  if (medicine.approvalStatus === "rejected") {
+    return {
+      success: true,
+      status: "REJECTED",
+      authenticityScore: 0,
+      isFake: false,
+      medicine: {
+        id: medicine.id,
+        batchId: medicine.batchId,
+        name: medicine.name,
+        company: medicine.company,
+        manufacturer: medicine.manufacturer,
+        manufacturingDate: medicine.manufacturingDate,
+        expiryDate: medicine.expiryDate,
+        composition: medicine.composition || "",
+        medicineImage: medicine.medicineImage,
+        imageUrl: medicine.medicineImage,
+        approvalStatus: "rejected",
+        status: "REJECTED",
+        rejectionReason: medicine.rejectionReason || "Failed regulatory compliance review",
+        blockchainStatus: "Rejected",
+      },
+      result: {
+        score: 0,
+        status: "REJECTED",
+        riskLevel: "HIGH",
+        code: "SUBMISSION_REJECTED",
+      },
+      checks: {
+        qr: { status: "REJECTED", score: 0 },
+        database: { status: "REJECTED_BY_ADMIN", score: 0 },
+        ocr: { status: "UNAVAILABLE", score: 0 },
+        blockchain: { status: "REJECTED_ON_CHAIN", score: 0 },
+        supplyChain: { status: "BLOCKED_FROM_DISTRIBUTION", score: 0 },
+        expiry: { status: "UNKNOWN", score: 0 },
+        ai: { status: "UNAVAILABLE", confidence: 0, score: 0 },
+        qrReuseRisk: { status: "HIGH", score: 0 },
+      },
+      layers: {
+        qr: "REJECTED",
+        database: "REJECTED_BY_ADMIN",
+        integrity: "FAILED_REJECTED",
+        blockchain: "REJECTED_ON_CHAIN",
+        expiry: "UNKNOWN",
+        supplyChain: "BLOCKED_FROM_DISTRIBUTION",
+        qrReuseRisk: "HIGH",
+      },
+      reasons: [
+        "✖ REJECTED MEDICINE: This medicine batch was reviewed by the compliance administration and REJECTED.",
+        medicine.rejectionReason ? `Reason for rejection: "${medicine.rejectionReason}"` : "The submission failed authenticity, licensing, or documentation standards.",
+        "🚫 Strictly Forbidden: This medicine is unauthorized for sale, distribution, or consumption.",
+      ],
+      warnings: [
+        "DO NOT CONSUME OR DISPENSE. This medicine submission was rejected by regulatory authority.",
+      ],
+    };
+  }
+
   // Record Verification Scan & Increment Scan Frequency (Anti-Cloning Risk)
   medicine.verificationCount = (medicine.verificationCount || 0) + 1;
   medicine.verificationLogs = medicine.verificationLogs || [];
@@ -520,6 +637,8 @@ export async function runFullAuthenticityAudit({ queryCode, imageFile = null, fo
 
   const finalPayload = {
     success: true,
+    status: finalStatus,
+    authenticityScore: totalScore,
     isFake: false,
     medicine: {
       id: medicine.id,
@@ -533,6 +652,8 @@ export async function runFullAuthenticityAudit({ queryCode, imageFile = null, fo
       price: medicine.price,
       quantity: medicine.quantity,
       medicineImage: medicine.medicineImage,
+      composition: medicine.composition || "",
+      approvalStatus: medicine.approvalStatus || "approved",
       governmentCertificate: medicine.governmentCertificate,
       blockchainTxHash: medicine.blockchainTxHash,
       blockchainStatus: medicine.blockchainStatus,

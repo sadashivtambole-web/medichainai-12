@@ -89,7 +89,12 @@ export const schemas = {
     expiryDate: Joi.string().required(),
     price: Joi.string().trim().max(50).allow(""),
     quantity: Joi.number().integer().min(1).max(10000000),
+    composition: Joi.string().trim().max(1000).allow(""),
   }).unknown(true), // allow multer file fields
+
+  rejectMedicine: Joi.object({
+    rejectionReason: Joi.string().trim().min(3).max(1000).required(),
+  }),
 
   qrGenerate: Joi.object({
     medicineId: idStr.allow(""),

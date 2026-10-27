@@ -435,6 +435,183 @@ export class EmailService {
   }
 
   // ──────────────────────────────────────────────────────────────────────
+  // 3. MEDICINE LIFECYCLE EMAILS (Approval, Rejection, Submission)
+  // ──────────────────────────────────────────────────────────────────────
+  /**
+   * Sent to Manufacturer when a new medicine is registered (Awaiting Admin review)
+   */
+  async sendMedicineSubmissionPendingEmail({ toEmail, fullName, medicineName, batchNumber, manufacturingDate, expiryDate }) {
+    const subject = `${APP_NAME} – Medicine Submission Received: ${medicineName} (Batch ${batchNumber}) [Pending Review]`;
+    const html = this._htmlWrapper(`
+      <p style="margin:0 0 16px;font-size:17px;font-weight:700;color:#1E293B;">
+        Dear ${fullName || "Manufacturer Partner"},
+      </p>
+
+      <div style="background:#F0F9FF;border:1px solid #BAE6FD;border-radius:12px;padding:22px;margin-bottom:24px;text-align:center;">
+        <div style="font-size:32px;margin-bottom:8px;">⏳</div>
+        <div style="font-size:18px;font-weight:800;color:#0369A1;">Medicine Submission Received</div>
+        <div style="font-size:13px;color:#0284C7;margin-top:6px;line-height:1.5;">
+          Your batch submission for <strong>${medicineName}</strong> (Batch: <code>${batchNumber}</code>) has been securely logged and is currently <strong>PENDING Admin Compliance Review</strong>.
+        </div>
+      </div>
+
+      <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:18px;margin-bottom:20px;">
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#94A3B8;margin-bottom:10px;">Submission Summary</div>
+        <p style="margin:0 0 6px;font-size:13px;color:#475569;"><strong>Medicine:</strong> ${medicineName}</p>
+        <p style="margin:0 0 6px;font-size:13px;color:#475569;"><strong>Batch ID:</strong> ${batchNumber}</p>
+        <p style="margin:0 0 6px;font-size:13px;color:#475569;"><strong>Manufacturing Date:</strong> ${manufacturingDate}</p>
+        <p style="margin:0 0 6px;font-size:13px;color:#475569;"><strong>Expiry Date:</strong> ${expiryDate}</p>
+        <p style="margin:0;font-size:13px;color:#475569;"><strong>Status:</strong> <span style="color:#0284C7;font-weight:700;">Pending Admin Approval</span></p>
+      </div>
+
+      <p style="font-size:13px;color:#64748B;line-height:1.6;margin:0 0 20px;">
+        ⚠️ <em>Note: This medicine batch will not be released for distribution or verified on the public portal until an Admin reviews and approves the submission.</em>
+      </p>
+
+      <div style="border-top:1px solid #E2E8F0;padding-top:16px;">
+        <p style="margin:0;font-size:12px;color:#94A3B8;">The ${APP_NAME} Regulatory Compliance Team</p>
+      </div>
+    `);
+
+    const text = `Dear ${fullName || "Manufacturer Partner"},\n\n` +
+      `Your medicine submission for ${medicineName} (Batch ${batchNumber}) has been received and is PENDING Admin approval.\n\n` +
+      `Batch Details:\n- Medicine: ${medicineName}\n- Batch ID: ${batchNumber}\n- Expiry: ${expiryDate}\n- Status: Pending Approval\n\n` +
+      `You will receive an official notification once reviewed by our compliance administrators.\n\n` +
+      `The ${APP_NAME} Regulatory Team\n`;
+
+    return this._dispatch({ to: toEmail, subject, text, html });
+  }
+
+  /**
+   * Sent to Admin/Creator when a new medicine is registered and requires approval
+   */
+  async sendAdminNewMedicineNotificationEmail({ adminEmail, medicineName, batchNumber, manufacturerName, submittedAt }) {
+    const subject = `[Action Required] ${APP_NAME} – New Medicine Awaiting Approval: ${medicineName} (Batch ${batchNumber})`;
+    const html = this._htmlWrapper(`
+      <p style="margin:0 0 16px;font-size:17px;font-weight:700;color:#1E293B;">
+        Administrator Compliance Alert,
+      </p>
+
+      <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:12px;padding:22px;margin-bottom:24px;text-align:center;">
+        <div style="font-size:32px;margin-bottom:8px;">📋</div>
+        <div style="font-size:18px;font-weight:800;color:#92400E;">New Medicine Batch Requires Review</div>
+        <div style="font-size:13px;color:#B45309;margin-top:6px;">
+          A certified manufacturer has submitted a new drug batch for network verification.
+        </div>
+      </div>
+
+      <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:18px;margin-bottom:20px;">
+        <p style="margin:0 0 6px;font-size:13px;color:#475569;"><strong>Manufacturer:</strong> ${manufacturerName}</p>
+        <p style="margin:0 0 6px;font-size:13px;color:#475569;"><strong>Medicine:</strong> ${medicineName}</p>
+        <p style="margin:0 0 6px;font-size:13px;color:#475569;"><strong>Batch ID:</strong> ${batchNumber}</p>
+        <p style="margin:0;font-size:13px;color:#475569;"><strong>Submitted:</strong> ${submittedAt ? new Date(submittedAt).toLocaleString("en-IN") : new Date().toLocaleString("en-IN")}</p>
+      </div>
+
+      <p style="font-size:13px;color:#475569;margin-bottom:20px;">
+        Please sign in to the Admin Dashboard to inspect the chemical composition, expiry dates, and uploaded packaging images to make an approval decision.
+      </p>
+    `);
+
+    const text = `Administrator Alert: A new medicine batch requires approval.\n\n` +
+      `Manufacturer: ${manufacturerName}\nMedicine: ${medicineName}\nBatch: ${batchNumber}\n\n` +
+      `Please log in to the Creator/Admin Dashboard to inspect and decide.\n`;
+
+    return this._dispatch({ to: adminEmail, subject, text, html });
+  }
+
+  /**
+   * Sent to Manufacturer when Admin approves the medicine
+   */
+  async sendMedicineApprovalEmail({ toEmail, fullName, medicineName, batchNumber, manufacturingDate, expiryDate, approvedBy, txHash, loginUrl }) {
+    const subject = `✅ ${APP_NAME} – Medicine Batch Approved: ${medicineName} (Batch ${batchNumber})`;
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const resolvedUrl = loginUrl || `${frontendUrl}/login`;
+
+    const html = this._htmlWrapper(`
+      <p style="margin:0 0 16px;font-size:17px;font-weight:700;color:#1E293B;">
+        Dear ${fullName || "Manufacturer Partner"},
+      </p>
+
+      <div style="background:#ECFDF5;border:1px solid #6EE7B7;border-radius:12px;padding:22px;margin-bottom:24px;text-align:center;">
+        <div style="font-size:32px;margin-bottom:8px;">✅</div>
+        <div style="font-size:19px;font-weight:800;color:#065F46;">Medicine Registration Approved!</div>
+        <div style="font-size:14px;color:#047857;margin-top:6px;line-height:1.5;">
+          Your medicine batch <strong>${medicineName}</strong> (Batch: <code>${batchNumber}</code>) has been approved by ${approvedBy || "the Administration"} and is now <strong>recorded on DrugChain</strong>.
+        </div>
+      </div>
+
+      <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:20px;margin-bottom:24px;">
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#94A3B8;margin-bottom:12px;">Verified Blockchain Record</div>
+        <p style="margin:0 0 8px;font-size:14px;color:#475569;"><strong>Medicine:</strong> ${medicineName}</p>
+        <p style="margin:0 0 8px;font-size:14px;color:#475569;"><strong>Batch Number:</strong> ${batchNumber}</p>
+        <p style="margin:0 0 8px;font-size:14px;color:#475569;"><strong>Expiry Date:</strong> ${expiryDate}</p>
+        <p style="margin:0 0 8px;font-size:14px;color:#475569;"><strong>Approved By:</strong> ${approvedBy || "Compliance Administrator"}</p>
+        ${txHash ? `<p style="margin:0;font-size:13px;color:#0284C7;font-family:monospace;word-break:break-all;"><strong>Blockchain Tx:</strong> ${txHash}</p>` : ""}
+      </div>
+
+      <p style="font-size:14px;color:#475569;line-height:1.6;margin-bottom:24px;">
+        🚀 This batch is now available for supply-chain dispatch to your authorized distributors and will verify as authentic on the MediChainAI verification portal.
+      </p>
+
+      <div style="text-align:center;margin:28px 0;">
+        <a href="${resolvedUrl}" style="background:${BRAND_COLOR};color:#ffffff;padding:12px 32px;text-decoration:none;border-radius:10px;font-weight:700;font-size:14px;display:inline-block;">
+          View in Manufacturer Portal →
+        </a>
+      </div>
+    `);
+
+    const text = `Dear ${fullName || "Manufacturer Partner"},\n\n` +
+      `Great news! Your medicine ${medicineName} (Batch ${batchNumber}) has been APPROVED by ${approvedBy || "MediChainAI Admin"}.\n\n` +
+      `Blockchain Status: Confirmed & Minted on DrugChain\n` +
+      (txHash ? `TxHash: ${txHash}\n` : "") +
+      `Expiry: ${expiryDate}\n\n` +
+      `The batch is now active in the supply chain and will verify as authentic.\n\n` +
+      `The ${APP_NAME} Team\n`;
+
+    return this._dispatch({ to: toEmail, subject, text, html });
+  }
+
+  /**
+   * Sent to Manufacturer when Admin rejects the medicine
+   */
+  async sendMedicineRejectionEmail({ toEmail, fullName, medicineName, batchNumber, rejectionReason, rejectedBy }) {
+    const subject = `⚠️ ${APP_NAME} – Medicine Submission Rejected: ${medicineName} (Batch ${batchNumber})`;
+    const reasonText = rejectionReason && rejectionReason.trim() ? rejectionReason.trim() : "Documentation or packaging inspection did not meet regulatory standards.";
+
+    const html = this._htmlWrapper(`
+      <p style="margin:0 0 16px;font-size:17px;font-weight:700;color:#1E293B;">
+        Dear ${fullName || "Manufacturer Partner"},
+      </p>
+
+      <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;padding:22px;margin-bottom:24px;text-align:center;">
+        <div style="font-size:32px;margin-bottom:8px;">✖</div>
+        <div style="font-size:19px;font-weight:800;color:#991B1B;">Medicine Submission Rejected</div>
+        <div style="font-size:14px;color:#B91C1C;margin-top:6px;line-height:1.5;">
+          Your batch submission for <strong>${medicineName}</strong> (Batch: <code>${batchNumber}</code>) was rejected during compliance review.
+        </div>
+      </div>
+
+      <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:12px;padding:20px;margin-bottom:24px;">
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#92400E;margin-bottom:8px;">Reason for Rejection</div>
+        <p style="margin:0;font-size:14px;color:#78350F;line-height:1.6;font-weight:600;">${reasonText}</p>
+      </div>
+
+      <p style="font-size:13px;color:#475569;line-height:1.6;margin-bottom:20px;">
+        This medicine batch will <strong>NOT</strong> be distributed across the network and will not verify as authentic. If you believe this decision was made in error or wish to provide corrected documentation, please contact compliance support at <a href="mailto:${SUPPORT_EMAIL}" style="color:${BRAND_COLOR};">${SUPPORT_EMAIL}</a>.
+      </p>
+    `);
+
+    const text = `Dear ${fullName || "Manufacturer Partner"},\n\n` +
+      `Your medicine submission for ${medicineName} (Batch ${batchNumber}) was REJECTED during compliance review.\n\n` +
+      `Reason:\n${reasonText}\n\n` +
+      `This batch will not be released for supply chain distribution.\n\n` +
+      `Support: ${SUPPORT_EMAIL}\n` +
+      `The ${APP_NAME} Compliance Division\n`;
+
+    return this._dispatch({ to: toEmail, subject, text, html });
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
   // Backward-compatible aliases
   // ──────────────────────────────────────────────────────────────────────
   async sendApprovalNotificationEmail(opts) {

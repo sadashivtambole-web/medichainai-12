@@ -307,7 +307,7 @@ export default function Pharmacy() {
                 </div>
                 <div style={{ borderRadius: 12, overflow: "hidden", border: "1px solid #E2E8F0", maxHeight: 200 }}>
                   <MedicineImage
-                    src={found.medicineImage}
+                    src={found.imageUrl || found.medicineImage}
                     alt={`${found.name} packaging`}
                     style={{ height: 200 }}
                     placeholderSize={120}

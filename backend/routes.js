@@ -1,4 +1,5 @@
 import express from "express";
+import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 import axios from "axios";
 import crypto from "crypto";
@@ -2255,6 +2256,285 @@ router.get("/creator/blockchain/audit", verifyToken, requireRole("Creator"), asy
   }
 });
 
+/* ── CREATOR MEDICINE APPROVAL & MANAGEMENT ────────────────────────── */
+// 1. Get Pending Medicines Awaiting Review
+router.get("/creator/medicines/pending", verifyToken, requireRole("Creator"), async (req, res) => {
+  try {
+    const pendingMeds = await Medicine.find({ approvalStatus: "pending" })
+      .populate("manufacturerId", "name fullName email company companyName phone")
+      .sort({ createdAt: -1 });
+    return sendSuccess(res, pendingMeds, "Pending medicine submissions retrieved");
+  } catch (err) {
+    logger.error("Failed to fetch pending medicines", { error: err.message });
+    return sendError(res, err.message, "FETCH_PENDING_FAILED", 500);
+  }
+});
+
+// 2. Get All Medicines with status filtering for Creator
+router.get("/creator/medicines", verifyToken, requireRole("Creator"), async (req, res) => {
+  try {
+    const { status, search } = req.query;
+    let query = {};
+    if (status && status !== "ALL" && status !== "all") {
+      query.approvalStatus = status.toLowerCase();
+    }
+    if (search && search.trim()) {
+      const q = search.trim();
+      query.$or = [
+        { name: new RegExp(q, "i") },
+        { batchId: new RegExp(q, "i") },
+        { company: new RegExp(q, "i") },
+        { manufacturer: new RegExp(q, "i") },
+      ];
+    }
+    const medicines = await Medicine.find(query)
+      .populate("manufacturerId", "name fullName email company companyName")
+      .sort({ createdAt: -1 });
+    return sendSuccess(res, medicines, "Creator medicines list retrieved");
+  } catch (err) {
+    return sendError(res, err.message, "FETCH_MEDICINES_FAILED", 500);
+  }
+});
+
+// 3. Approve Medicine Submission on DrugChain
+router.patch("/creator/medicines/:id/approve", verifyToken, requireRole("Creator"), async (req, res) => {
+  try {
+    const medicineParam = req.params.id.trim();
+    const queryConditions = [
+      { id: new RegExp(`^${medicineParam}$`, "i") },
+      { batchId: new RegExp(`^${medicineParam}$`, "i") },
+    ];
+    if (mongoose.isValidObjectId(medicineParam)) {
+      queryConditions.push({ _id: medicineParam });
+    }
+    const medicine = await Medicine.findOne({ $or: queryConditions });
+
+    if (!medicine) {
+      return sendError(res, "Medicine submission not found", "NOT_FOUND", 404);
+    }
+
+    if (medicine.approvalStatus === "approved") {
+      return sendSuccess(res, medicine, "Medicine is already approved on DrugChain");
+    }
+
+    // 1. Record on DrugChain blockchain
+    const chainRecord = await recordMedicineOnChain(
+      {
+        id: medicine.id,
+        batchId: medicine.batchId,
+        name: medicine.name,
+        manufacturer: medicine.company || medicine.manufacturer,
+        manufacturerCode: medicine.manufacturerCode || "",
+        manufacturingDate: medicine.manufacturingDate,
+        expiryDate: medicine.expiryDate,
+      },
+      "Creator"
+    );
+
+    // 2. Update Database Record
+    medicine.approvalStatus = "approved";
+    medicine.approvedBy = req.user.email;
+    medicine.approvedAt = new Date();
+    medicine.rejectedBy = null;
+    medicine.rejectedAt = null;
+    medicine.rejectionReason = "";
+    medicine.status = "AUTHENTIC";
+    medicine.blockchainTxHash = chainRecord.txHash;
+    medicine.medicineDataHash = chainRecord.dataHash;
+    medicine.blockchainStatus = "Confirmed";
+    medicine.transferHistory = [
+      {
+        step: 1,
+        role: "Manufacturer",
+        actor: medicine.company || medicine.manufacturer,
+        timestamp: new Date().toLocaleString("en-IN"),
+        status: "Approved on DrugChain",
+        txHash: chainRecord.txHash,
+      },
+    ];
+
+    await medicine.save();
+    logger.info("Medicine approved by Admin", { id: medicine.id, batchId: medicine.batchId, admin: req.user.email });
+
+    // 3. Create SupplyChainTransaction for linked distributors (releasing batch to distribution)
+    const mfrDistLinks = await SupplyChainLink.find({
+      linkType: "MANUFACTURER_DISTRIBUTOR",
+      fromUserId: medicine.manufacturerId,
+      status: "APPROVED",
+    });
+    const toDistributors = mfrDistLinks.length > 0 ? mfrDistLinks : [null];
+
+    for (const link of toDistributors) {
+      const transferId = `TR-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
+      const newTransfer = new SupplyChainTransaction({
+        id: transferId,
+        transferId,
+        medicineId: medicine.id,
+        medicineName: medicine.name,
+        batchId: medicine.batchId,
+        fromUserId: medicine.manufacturerId,
+        fromRole: "Manufacturer",
+        from: medicine.company || medicine.manufacturer,
+        toRole: "Distributor",
+        toUserId: link ? link.toUserId : null,
+        to: link ? link.toCompanyName : "Pending Assignment",
+        quantity: `${medicine.quantity} Units`,
+        timestamp: new Date().toLocaleString("en-IN"),
+        action: "REGISTERED",
+        status: "Pending Confirmation",
+        blockchainStatus: "Pending Confirmation",
+      });
+      await newTransfer.save();
+    }
+
+    // 4. Record Blockchain Transaction in collection
+    try {
+      await BlockchainTransaction.create({
+        medicineId: medicine.id,
+        batchId: medicine.batchId,
+        transactionType: "MEDICINE_REGISTRATION",
+        blockIndex: chainRecord.blockIndex || 1,
+        transactionHash: chainRecord.txHash,
+        dataHash: chainRecord.dataHash || "",
+        timestamp: new Date(),
+        validationStatus: "VALID",
+      });
+    } catch (bcErr) {}
+
+    // 5. In-App Notification to Manufacturer
+    if (medicine.manufacturerId) {
+      try {
+        await Notification.create({
+          userId: medicine.manufacturerId,
+          title: "Medicine Approved on DrugChain",
+          message: `Your medicine "${medicine.name}" (Batch ${medicine.batchId}) has been officially APPROVED by Admin compliance review and recorded on DrugChain.`,
+          type: "APPROVAL",
+        });
+      } catch (notifErr) {}
+    }
+
+    // 6. Send Approval Email to Manufacturer
+    try {
+      const mfrUser = medicine.manufacturerId ? await User.findById(medicine.manufacturerId) : null;
+      const recipientEmail = mfrUser?.email || null;
+      if (recipientEmail) {
+        emailService.sendMedicineApprovalEmail({
+          toEmail: recipientEmail,
+          fullName: mfrUser?.fullName || mfrUser?.name || medicine.company,
+          medicineName: medicine.name,
+          batchNumber: medicine.batchId,
+          manufacturingDate: medicine.manufacturingDate,
+          expiryDate: medicine.expiryDate,
+          approvedBy: req.user.email,
+          txHash: chainRecord.txHash,
+        }).catch((err) => logger.warn("Approval email dispatch failed", { error: err.message }));
+      }
+    } catch (emailErr) {}
+
+    // 7. Audit Log
+    try {
+      await AuditLog.create({
+        userId: req.user._id,
+        email: req.user.email,
+        role: req.user.role,
+        action: "ADMIN_MEDICINE_APPROVED",
+        resource: "Medicine",
+        resourceId: medicine.id,
+        ipAddress: req.ip || "127.0.0.1",
+        result: "SUCCESS",
+        details: { batchId: medicine.batchId, medicineName: medicine.name, txHash: chainRecord.txHash },
+      });
+    } catch (logErr) {}
+
+    return sendSuccess(res, medicine, `Medicine '${medicine.name}' (Batch ${medicine.batchId}) has been APPROVED and minted on DrugChain.`);
+  } catch (err) {
+    logger.error("Medicine approval failed", { error: err.message });
+    return sendError(res, err.message, "APPROVE_FAILED", 500);
+  }
+});
+
+// 4. Reject Medicine Submission
+router.patch("/creator/medicines/:id/reject", verifyToken, requireRole("Creator"), validate(schemas.rejectMedicine), async (req, res) => {
+  try {
+    const medicineParam = req.params.id.trim();
+    const { rejectionReason } = req.body;
+
+    const queryConditions = [
+      { id: new RegExp(`^${medicineParam}$`, "i") },
+      { batchId: new RegExp(`^${medicineParam}$`, "i") },
+    ];
+    if (mongoose.isValidObjectId(medicineParam)) {
+      queryConditions.push({ _id: medicineParam });
+    }
+    const medicine = await Medicine.findOne({ $or: queryConditions });
+
+    if (!medicine) {
+      return sendError(res, "Medicine submission not found", "NOT_FOUND", 404);
+    }
+
+    medicine.approvalStatus = "rejected";
+    medicine.rejectedBy = req.user.email;
+    medicine.rejectedAt = new Date();
+    medicine.rejectionReason = rejectionReason.trim();
+    medicine.status = "UNABLE TO VERIFY";
+    medicine.blockchainStatus = "Rejected";
+
+    await medicine.save();
+    logger.info("Medicine rejected by Admin", { id: medicine.id, batchId: medicine.batchId, admin: req.user.email, reason: rejectionReason });
+
+    // Clean up any supply chain transfers for this batch so distributors cannot access it
+    await SupplyChainTransaction.deleteMany({ batchId: medicine.batchId });
+
+    // In-App Notification to Manufacturer
+    if (medicine.manufacturerId) {
+      try {
+        await Notification.create({
+          userId: medicine.manufacturerId,
+          title: "Medicine Submission Rejected",
+          message: `Your medicine "${medicine.name}" (Batch ${medicine.batchId}) was rejected by ${req.user.email}. Reason: ${rejectionReason.trim()}`,
+          type: "WARNING",
+        });
+      } catch (notifErr) {}
+    }
+
+    // Send Rejection Email to Manufacturer
+    try {
+      const mfrUser = medicine.manufacturerId ? await User.findById(medicine.manufacturerId) : null;
+      const recipientEmail = mfrUser?.email || null;
+      if (recipientEmail) {
+        emailService.sendMedicineRejectionEmail({
+          toEmail: recipientEmail,
+          fullName: mfrUser?.fullName || mfrUser?.name || medicine.company,
+          medicineName: medicine.name,
+          batchNumber: medicine.batchId,
+          rejectionReason: rejectionReason.trim(),
+          rejectedBy: req.user.email,
+        }).catch((err) => logger.warn("Rejection email dispatch failed", { error: err.message }));
+      }
+    } catch (emailErr) {}
+
+    // Audit Log
+    try {
+      await AuditLog.create({
+        userId: req.user._id,
+        email: req.user.email,
+        role: req.user.role,
+        action: "ADMIN_MEDICINE_REJECTED",
+        resource: "Medicine",
+        resourceId: medicine.id,
+        ipAddress: req.ip || "127.0.0.1",
+        result: "SUCCESS",
+        details: { batchId: medicine.batchId, medicineName: medicine.name, rejectionReason },
+      });
+    } catch (logErr) {}
+
+    return sendSuccess(res, medicine, `Medicine '${medicine.name}' (Batch ${medicine.batchId}) has been REJECTED.`);
+  } catch (err) {
+    logger.error("Medicine rejection failed", { error: err.message });
+    return sendError(res, err.message, "REJECT_FAILED", 500);
+  }
+});
+
 /* ══════════════════════════════════════════════════════════════════════
    2. AI & OCR VERIFICATION ENGINE (VISUAL RISK ASSESSMENT)
 ══════════════════════════════════════════════════════════════════════ */
@@ -2390,6 +2670,7 @@ router.post(
         expiryDate,
         price,
         quantity,
+        composition,
       } = req.body;
 
       if (!medicineName || !batchNumber || !companyName || !manufacturingDate || !expiryDate) {
@@ -2405,7 +2686,6 @@ router.post(
       // ── STEP 1: Check MongoDB for existing record by batchId ────────────
       const existingInDB = await Medicine.findOne({ batchId });
       if (existingInDB) {
-        // Batch already registered in DB — return it clearly, don't error
         const chainHistory = drugChainService.getMedicineHistory(existingInDB.id) || [];
         return res.status(200).json({
           success: false,
@@ -2423,8 +2703,6 @@ router.post(
       // ── STEP 2: Check blockchain for orphaned chain record (chain has it, DB doesn't) ──
       const chainExisting = drugChainService.getRegistrationRecord(null, batchId);
       if (chainExisting) {
-        // Batch is on-chain but not in DB — this is a DB/chain sync gap.
-        // Sync it to DB from chain data so it's queryable.
         const syncedId = chainExisting.medicineId || `MED-SYNCED-${batchId}`;
         const syncedMed = new Medicine({
           id: syncedId,
@@ -2440,11 +2718,15 @@ router.post(
           expiryDate: chainExisting.metadata?.expiryDate || expiryDate,
           price: price || "₹120.00",
           quantity: Number(quantity) || 1000,
+          composition: composition?.trim() || "",
           medicineImage: req.files?.medicineImage?.[0] ? `/uploads/${req.files.medicineImage[0].filename}` : null,
           currentOwnerId: req.user._id,
           currentOwnerRole: "Manufacturer",
           currentHolder: "Manufacturer",
           status: "AUTHENTIC",
+          approvalStatus: "approved",
+          approvedBy: "System (Chain Sync)",
+          approvedAt: new Date(),
           medicineDataHash: chainExisting.dataHash,
           blockchainTxHash: chainExisting.blockHash,
           blockchainStatus: "Confirmed",
@@ -2461,7 +2743,6 @@ router.post(
           await syncedMed.save();
           logger.info("Medicine synced from chain to DB", { batchId, syncedId });
         } catch (syncErr) {
-          // Unique key race — fetch what was just inserted
           const raceDoc = await Medicine.findOne({ batchId });
           if (raceDoc) {
             return res.status(200).json({
@@ -2483,54 +2764,15 @@ router.post(
       }
 
       // ── STEP 3: Generate a collision-safe unique medicine ID ────────────
-      // Use timestamp + random suffix to avoid count-based collisions
       const year = new Date().getFullYear();
       const uniqueSuffix = `${Date.now().toString(36).toUpperCase().slice(-5)}${Math.floor(Math.random() * 100).toString().padStart(2, "0")}`;
       let medicineId = `MED-${year}-${uniqueSuffix}`;
-      // Ensure no DB collision (extremely unlikely but safe)
       let idExists = await Medicine.findOne({ id: medicineId });
       let idAttempts = 0;
       while (idExists && idAttempts < 5) {
         medicineId = `MED-${year}-${Date.now().toString(36).toUpperCase().slice(-5)}${Math.floor(Math.random() * 99 + 1)}`;
         idExists = await Medicine.findOne({ id: medicineId });
         idAttempts++;
-      }
-
-      // ── STEP 4: Record on DrugChain (will return alreadyExists:true if race condition) ──
-      const chainRecord = await recordMedicineOnChain(
-        {
-          id: medicineId,
-          batchId,
-          name: medicineName.trim(),
-          manufacturer: companyName.trim(),
-          manufacturerCode: manufacturerCode?.trim() || "",
-          manufacturingDate,
-          expiryDate,
-        },
-        req.user.role
-      );
-
-      // If chain returned alreadyExists (race condition between check and write)
-      if (chainRecord.alreadyExists) {
-        const raceDBRecord = await Medicine.findOne({ batchId });
-        const msg = `Batch '${batchId}' is already registered on DrugChain.`;
-        if (raceDBRecord) {
-          return res.status(200).json({
-            success: false,
-            code: "ALREADY_REGISTERED",
-            alreadyRegistered: true,
-            message: msg,
-            data: { ...raceDBRecord.toObject(), registrationStatus: "EXISTING_RECORD" },
-          });
-        }
-        // DB record missing but chain has it — surface chain info
-        return res.status(200).json({
-          success: false,
-          code: "ALREADY_REGISTERED",
-          alreadyRegistered: true,
-          message: msg,
-          data: { batchId, chainRecord, registrationStatus: "ON_CHAIN_ONLY" },
-        });
       }
 
       const medicineImage = req.files?.medicineImage?.[0]
@@ -2540,7 +2782,106 @@ router.post(
         ? `/uploads/${req.files.governmentCertificate[0].filename}`
         : null;
 
-      // ── STEP 5: Save to MongoDB ─────────────────────────────────────────
+      const isCreator = req.user.role === "Creator";
+
+      // ── CASE A: CREATOR SUBMISSION (Direct Mint & Auto-Approval) ─────────
+      if (isCreator) {
+        const chainRecord = await recordMedicineOnChain(
+          {
+            id: medicineId,
+            batchId,
+            name: medicineName.trim(),
+            manufacturer: companyName.trim(),
+            manufacturerCode: manufacturerCode?.trim() || "",
+            manufacturingDate,
+            expiryDate,
+          },
+          req.user.role
+        );
+
+        const newMedicine = new Medicine({
+          id: medicineId,
+          batchId,
+          name: medicineName.trim(),
+          medicineName: medicineName.trim(),
+          manufacturerId: req.user._id,
+          manufacturer: manufacturerName?.trim() || companyName?.trim(),
+          manufacturerName: manufacturerName?.trim() || "",
+          company: companyName.trim(),
+          manufacturerCode: manufacturerCode?.trim() || "",
+          manufacturingDate,
+          expiryDate,
+          price: price || "₹120.00",
+          quantity: Number(quantity) || 1000,
+          composition: composition?.trim() || "",
+          medicineImage,
+          governmentCertificate,
+          approvalStatus: "approved",
+          approvedBy: req.user.email,
+          approvedAt: new Date(),
+          currentOwnerId: req.user._id,
+          currentOwnerRole: "Manufacturer",
+          currentHolder: "Manufacturer",
+          status: "AUTHENTIC",
+          medicineDataHash: chainRecord.dataHash,
+          blockchainTxHash: chainRecord.txHash,
+          blockchainStatus: "Confirmed",
+          transferHistory: [
+            {
+              step: 1,
+              role: "Creator",
+              actor: companyName.trim(),
+              timestamp: new Date().toLocaleString("en-IN"),
+              status: "Registered and Approved by Creator",
+              txHash: chainRecord.txHash,
+            },
+          ],
+        });
+
+        await newMedicine.save();
+
+        // Create SupplyChainTransaction for distributors
+        const mfrDistLinks = await SupplyChainLink.find({
+          linkType: "MANUFACTURER_DISTRIBUTOR",
+          status: "APPROVED",
+        });
+        const toDistributors = mfrDistLinks.length > 0 ? mfrDistLinks : [null];
+        for (const link of toDistributors) {
+          const transferId = `TR-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
+          const newTransfer = new SupplyChainTransaction({
+            id: transferId,
+            transferId,
+            medicineId,
+            medicineName: newMedicine.name,
+            batchId,
+            fromUserId: req.user._id,
+            fromRole: "Manufacturer",
+            from: companyName.trim(),
+            toRole: "Distributor",
+            toUserId: link ? link.toUserId : null,
+            to: link ? link.toCompanyName : "Pending Assignment",
+            quantity: `${newMedicine.quantity} Units`,
+            timestamp: new Date().toLocaleString("en-IN"),
+            action: "REGISTERED",
+            status: "Pending Confirmation",
+            blockchainStatus: "Pending Confirmation",
+          });
+          await newTransfer.save();
+        }
+
+        return sendSuccess(res, newMedicine, "Medicine registered and approved directly by Creator", 201);
+      }
+
+      // ── CASE B: MANUFACTURER SUBMISSION (Saves with approvalStatus: 'pending') ──
+      const precalculatedHash = calculateMedicineDataHash({
+        medicineId,
+        batchNumber: batchId,
+        medicineName: medicineName.trim(),
+        manufacturerCode: manufacturerCode?.trim() || "",
+        manufacturingDate,
+        expiryDate,
+      });
+
       const newMedicine = new Medicine({
         id: medicineId,
         batchId,
@@ -2555,29 +2896,32 @@ router.post(
         expiryDate,
         price: price || "₹120.00",
         quantity: Number(quantity) || 1000,
+        composition: composition?.trim() || "",
         medicineImage,
         governmentCertificate,
+        approvalStatus: "pending",
+        submittedAt: new Date(),
         currentOwnerId: req.user._id,
         currentOwnerRole: "Manufacturer",
         currentHolder: "Manufacturer",
-        status: "AUTHENTIC",
-        medicineDataHash: chainRecord.dataHash,
-        blockchainTxHash: chainRecord.txHash,
-        blockchainStatus: "Confirmed",
+        status: "UNABLE TO VERIFY",
+        medicineDataHash: precalculatedHash,
+        blockchainTxHash: "",
+        blockchainStatus: "Pending Approval",
         transferHistory: [
           {
             step: 1,
             role: "Manufacturer",
             actor: companyName.trim(),
             timestamp: new Date().toLocaleString("en-IN"),
-            status: "Registered",
-            txHash: chainRecord.txHash,
+            status: "Submitted (Pending Admin Approval)",
+            txHash: null,
           },
         ],
       });
 
       await newMedicine.save();
-      logger.medicine("Medicine registered", { id: medicineId, batchId, by: req.user?.email });
+      logger.medicine("Medicine submitted for Admin approval", { id: medicineId, batchId, by: req.user?.email });
 
       // Silent security risk evaluation
       evaluateAndLogSecurityRisk({
@@ -2588,69 +2932,66 @@ router.post(
         data: { medicineName, batchId, batchNumber, manufacturingDate, expiryDate, price: price || "" },
       }).catch(() => {});
 
-      // ── STEP 6: Create SupplyChainTransaction for linked distributors ───
-      const mfrDistLinks = await SupplyChainLink.find({
-        linkType: "MANUFACTURER_DISTRIBUTOR",
-        fromUserId: req.user._id,
-        status: "APPROVED",
-      });
-      const toDistributors = mfrDistLinks.length > 0 ? mfrDistLinks : [null];
-
-      for (const link of toDistributors) {
-        const transferId = `TR-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
-        const newTransfer = new SupplyChainTransaction({
-          id: transferId,
-          transferId,
-          medicineId,
-          medicineName: newMedicine.name,
-          batchId,
-          fromUserId: req.user._id,
-          fromRole: "Manufacturer",
-          from: companyName.trim(),
-          toRole: "Distributor",
-          toUserId: link ? link.toUserId : null,
-          to: link ? link.toCompanyName : "Pending Assignment",
-          quantity: `${newMedicine.quantity} Units`,
-          timestamp: new Date().toLocaleString("en-IN"),
-          action: "REGISTERED",
-          status: "Pending Confirmation",
-          blockchainStatus: "Pending Confirmation",
-        });
-        await newTransfer.save();
-      }
-
-      // ── STEP 7: Record blockchain transaction in DB collection ──────────
+      // In-app notifications to all Admins/Creators
       try {
-        await BlockchainTransaction.create({
-          medicineId,
-          batchId,
-          transactionType: "MEDICINE_REGISTRATION",
-          blockIndex: chainRecord.blockIndex || 1,
-          transactionHash: chainRecord.txHash,
-          dataHash: chainRecord.dataHash || "",
-          timestamp: new Date(),
-          validationStatus: "VALID",
-        });
-      } catch (bcErr) {
-        logger.warn("Could not save BlockchainTransaction", { message: bcErr.message });
-      }
+        const creators = await User.find({ role: "Creator" });
+        for (const c of creators) {
+          await Notification.create({
+            userId: c._id,
+            title: "New Medicine Awaiting Approval",
+            message: `Manufacturer "${companyName.trim()}" submitted medicine "${medicineName.trim()}" (Batch: ${batchId}) requiring compliance review.`,
+            type: "APPROVAL",
+          });
+        }
+      } catch (notifErr) {}
 
-      // ── STEP 8: Audit log ───────────────────────────────────────────────
+      // Confirmation email to Manufacturer (Pending Notice - NOT approval)
+      try {
+        emailService.sendMedicineSubmissionPendingEmail({
+          toEmail: req.user.email,
+          fullName: req.user.fullName || req.user.name,
+          medicineName: medicineName.trim(),
+          batchNumber: batchId,
+          manufacturingDate,
+          expiryDate,
+        }).catch((err) => logger.warn("Manufacturer pending email note", { error: err.message }));
+      } catch (eErr) {}
+
+      // Notification email to Admin/Creator
+      try {
+        const creatorUser = await User.findOne({ role: "Creator" });
+        if (creatorUser?.email) {
+          emailService.sendAdminNewMedicineNotificationEmail({
+            adminEmail: creatorUser.email,
+            medicineName: medicineName.trim(),
+            batchNumber: batchId,
+            manufacturerName: companyName.trim(),
+            submittedAt: new Date(),
+          }).catch((err) => logger.warn("Admin new medicine email note", { error: err.message }));
+        }
+      } catch (aErr) {}
+
+      // Audit Log
       try {
         await AuditLog.create({
           userId: req.user._id,
           email: req.user.email,
           role: req.user.role,
-          action: "MEDICINE_REGISTERED",
+          action: "MEDICINE_SUBMITTED_PENDING_APPROVAL",
           resource: "Medicine",
           resourceId: medicineId,
           ipAddress: req.ip || "127.0.0.1",
           result: "SUCCESS",
-          details: { batchId, medicineName, txHash: chainRecord.txHash, blockIndex: chainRecord.blockIndex },
+          details: { batchId, medicineName, approvalStatus: "pending" },
         });
       } catch (auditErr) {}
 
-      return sendSuccess(res, newMedicine, "Medicine registered successfully and recorded on DrugChain", 201);
+      return sendSuccess(
+        res,
+        newMedicine,
+        "Medicine submitted successfully! It is now pending Admin approval before being released to distributors.",
+        201
+      );
     } catch (err) {
       return sendError(res, err.message, "MEDICINE_REGISTER_FAILED", 500);
     }
@@ -2659,7 +3000,6 @@ router.post(
 
 // Role-Based Query Isolation for Medicine Retrieval
 router.get("/medicines", verifyToken, requireRole("Manufacturer", "Distributor", "Pharmacy", "Creator"), async (req, res) => {
-
   try {
     const role = (req.user.role || "").toLowerCase();
     const userProfile = req.userProfile || await getProfileForUser(req.user);
@@ -2668,10 +3008,13 @@ router.get("/medicines", verifyToken, requireRole("Manufacturer", "Distributor",
     let query = {};
 
     if (role === "creator") {
-      // Super admin can see all
-      query = {};
+      // Creator can filter by approvalStatus query param or view all
+      const statusParam = req.query.approvalStatus || req.query.status;
+      if (statusParam && statusParam.toLowerCase() !== "all") {
+        query.approvalStatus = statusParam.toLowerCase();
+      }
     } else if (role === "manufacturer") {
-      // Manufacturer ONLY sees medicines they created or own
+      // Manufacturer ONLY sees medicines they created or own (all approval statuses so they can track pending/rejected)
       query = {
         $or: [
           { manufacturerId: req.user._id },
@@ -2680,9 +3023,13 @@ router.get("/medicines", verifyToken, requireRole("Manufacturer", "Distributor",
           { company: new RegExp(`^${company}$`, "i") },
         ],
       };
+      if (req.query.approvalStatus && req.query.approvalStatus !== "all") {
+        query.approvalStatus = req.query.approvalStatus.toLowerCase();
+      }
     } else if (role === "distributor") {
-      // Distributor ONLY sees medicines in distributor custody or assigned to them
+      // Distributor ONLY sees Admin-approved medicines
       query = {
+        approvalStatus: "approved",
         $or: [
           { currentOwnerId: req.user._id },
           { currentOwnerRole: "Distributor" },
@@ -2691,8 +3038,9 @@ router.get("/medicines", verifyToken, requireRole("Manufacturer", "Distributor",
         ],
       };
     } else if (role === "pharmacy") {
-      // Pharmacy ONLY sees medicines in pharmacy shelf or received/stocked by them
+      // Pharmacy ONLY sees Admin-approved medicines
       query = {
+        approvalStatus: "approved",
         $or: [
           { currentOwnerId: req.user._id },
           { currentOwnerRole: "Pharmacy" },
@@ -2747,8 +3095,11 @@ router.get("/medicines/:id", verifyToken, async (req, res) => {
       }
     }
 
-    // 4. Distributor isolation: Only distributors who handle or have received this batch
+    // 4. Distributor isolation: Only distributors who handle or have received this batch AND it is approved
     if (role === "distributor") {
+      if (medicine.approvalStatus !== "approved") {
+        return sendError(res, "Access denied: This medicine batch has not been approved by administration.", "FORBIDDEN", 403);
+      }
       const hasCustody = (medicine.currentOwnerId && medicine.currentOwnerId.toString() === req.user._id.toString()) ||
         medicine.currentHolder === "Distributor" ||
         (medicine.transferHistory && medicine.transferHistory.some(t => t.actor.toLowerCase().includes(company.toLowerCase())));
@@ -2761,8 +3112,11 @@ router.get("/medicines/:id", verifyToken, async (req, res) => {
       }
     }
 
-    // 5. Pharmacy isolation: Only pharmacy that received or is receiving this batch
+    // 5. Pharmacy isolation: Only pharmacy that received or is receiving this batch AND it is approved
     if (role === "pharmacy") {
+      if (medicine.approvalStatus !== "approved") {
+        return sendError(res, "Access denied: This medicine batch has not been approved by administration.", "FORBIDDEN", 403);
+      }
       const isPharmacyCustody = (medicine.currentOwnerId && medicine.currentOwnerId.toString() === req.user._id.toString()) ||
         medicine.currentHolder.toLowerCase().includes("pharmacy") ||
         (medicine.transferHistory && medicine.transferHistory.some(t => t.actor.toLowerCase().includes(company.toLowerCase())));
@@ -2814,15 +3168,25 @@ router.get("/transfers/incoming", verifyToken, requireRole("Distributor", "Pharm
       query = { $or: orConditions };
     }
 
-
     const rawTransfers = await SupplyChainTransaction.find(query).sort({ createdAt: -1 });
 
     // Enrich each transfer with the medicine image from the Medicine collection
     const batchIds = [...new Set(rawTransfers.map((t) => t.batchId).filter(Boolean))];
-    const medicines = await Medicine.find({ batchId: { $in: batchIds } }, { batchId: 1, medicineImage: 1, manufacturingDate: 1, expiryDate: 1 });
+    const medicines = await Medicine.find(
+      { batchId: { $in: batchIds } },
+      { batchId: 1, medicineImage: 1, manufacturingDate: 1, expiryDate: 1, approvalStatus: 1 }
+    );
     const medicineMap = Object.fromEntries(medicines.map((m) => [m.batchId, m]));
 
-    const transfers = rawTransfers.map((t) => {
+    // Strictly filter out transfers for unapproved medicines if caller is not Creator
+    const approvedBatchSet = new Set(
+      medicines.filter((m) => m.approvalStatus === "approved").map((m) => m.batchId)
+    );
+    const eligibleTransfers = role === "creator"
+      ? rawTransfers
+      : rawTransfers.filter((t) => approvedBatchSet.has(t.batchId));
+
+    const transfers = eligibleTransfers.map((t) => {
       const med = medicineMap[t.batchId];
       if (!med) return t;
       const plain = t.toObject ? t.toObject() : { ...t };
@@ -2831,6 +3195,7 @@ router.get("/transfers/incoming", verifyToken, requireRole("Distributor", "Pharm
         medicineImage: med.medicineImage || null,
         manufacturingDate: plain.manufacturingDate || med.manufacturingDate || null,
         expiryDate: plain.expiryDate || med.expiryDate || null,
+        approvalStatus: med.approvalStatus || "approved",
       };
     });
 
@@ -3061,6 +3426,10 @@ router.post("/pharmacy/:medicineId/confirm", verifyToken, requireRole("Pharmacy"
       return sendError(res, "Medicine not found", "NOT_FOUND", 404);
     }
 
+    if (medicine.approvalStatus !== "approved" && req.user.role !== "Creator") {
+      return sendError(res, "Cannot stock unapproved medicine batch. Batch is pending or rejected.", "MEDICINE_NOT_APPROVED", 400);
+    }
+
     const userProfile = req.userProfile || await getProfileForUser(req.user);
     const pharmacyActor = userProfile?.pharmacyName || userProfile?.companyName || req.user.company || "City Pharmacy (POS)";
     const ts = new Date().toLocaleString("en-IN");
@@ -3198,7 +3567,31 @@ router.get("/public/medicine/:code", async (req, res) => {
     });
 
     if (!medicine) return sendError(res, "Medicine not found", "NOT_FOUND", 404);
-    return sendSuccess(res, medicine, "Medicine details retrieved");
+
+    const isApproved = medicine.approvalStatus === "approved";
+    const isRejected = medicine.approvalStatus === "rejected";
+
+    const safePublicData = {
+      id: medicine.id,
+      batchId: medicine.batchId,
+      name: medicine.name,
+      medicineName: medicine.medicineName || medicine.name,
+      company: medicine.company,
+      manufacturer: medicine.manufacturer,
+      manufacturingDate: medicine.manufacturingDate,
+      expiryDate: medicine.expiryDate,
+      price: medicine.price,
+      composition: medicine.composition || "",
+      medicineImage: medicine.medicineImage,
+      approvalStatus: medicine.approvalStatus || "approved",
+      status: isApproved ? medicine.status : (isRejected ? "REJECTED" : "PENDING APPROVAL"),
+      blockchainStatus: isApproved ? medicine.blockchainStatus : (isRejected ? "Rejected" : "Pending Approval"),
+      rejectionReason: isRejected ? medicine.rejectionReason : undefined,
+      currentHolder: isApproved ? medicine.currentHolder : "Manufacturer (Pre-approval)",
+      transferHistory: isApproved ? medicine.transferHistory : [],
+    };
+
+    return sendSuccess(res, safePublicData, "Medicine details retrieved");
   } catch (err) {
     return sendError(res, err.message, "FETCH_FAILED", 500);
   }

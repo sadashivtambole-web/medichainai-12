@@ -352,7 +352,11 @@ export default function VerifyResult() {
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           className={`text-center bg-white rounded-3xl p-8 sm:p-10 shadow-sm mb-8 border-2 ${
-            isAuthentic ? "border-emerald-200" : "border-amber-200"
+            isAuthentic
+              ? "border-emerald-200"
+              : status === "REJECTED" || status === "SUBMISSION_REJECTED"
+              ? "border-rose-300 bg-rose-50/20"
+              : "border-amber-200 bg-amber-50/20"
           }`}
         >
           <StatusBadge status={status} size="large" />
@@ -367,7 +371,11 @@ export default function VerifyResult() {
           <div className="flex flex-wrap justify-center gap-6 sm:gap-10 mt-6 pt-6 border-t border-slate-100 text-xs">
             <div>
               <p className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Authenticity Score</p>
-              <p className="text-lg font-extrabold text-emerald-600 mt-0.5">{authenticityScore}/100</p>
+              <p className={`text-lg font-extrabold mt-0.5 ${
+                isAuthentic ? "text-emerald-600" : status === "REJECTED" ? "text-rose-600" : "text-amber-600"
+              }`}>
+                {authenticityScore}/100
+              </p>
             </div>
             <div>
               <p className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Verification Confidence</p>
@@ -403,14 +411,22 @@ export default function VerifyResult() {
           {/* Evidence Explanation */}
           {reasons && reasons.length > 0 && (
             <div className={`mt-6 p-4 rounded-2xl text-left max-w-xl mx-auto text-xs border ${
-              isAuthentic ? "bg-emerald-50/70 border-emerald-200" : "bg-amber-50/70 border-amber-200"
+              isAuthentic
+                ? "bg-emerald-50/70 border-emerald-200"
+                : status === "REJECTED" || status === "SUBMISSION_REJECTED"
+                ? "bg-rose-50/80 border-rose-200"
+                : "bg-amber-50/70 border-amber-200"
             }`}>
               <div className="font-extrabold uppercase tracking-wider mb-2 text-slate-800">
-                {isAuthentic ? "✓ Cryptographic Evidence Verified:" : "⚠ Supply-Chain Findings:"}
+                {isAuthentic
+                  ? "✓ Cryptographic Evidence Verified:"
+                  : status === "REJECTED" || status === "SUBMISSION_REJECTED"
+                  ? "❌ Rejection & Compliance Notice:"
+                  : "⚠ Verification Notice:"}
               </div>
               {reasons.map((r, i) => (
                 <div key={i} className="text-slate-700 flex items-start gap-1.5 mb-1">
-                  <span className={isAuthentic ? "text-emerald-600" : "text-amber-600"}>▸</span>
+                  <span className={isAuthentic ? "text-emerald-600" : status === "REJECTED" ? "text-rose-600" : "text-amber-600"}>▸</span>
                   <span>{r}</span>
                 </div>
               ))}
@@ -425,13 +441,13 @@ export default function VerifyResult() {
           </h2>
           <div style={{ borderRadius: 14, overflow: "hidden", maxHeight: 300, border: "1px solid #E2E8F0" }}>
             <MedicineImage
-              src={medicine.medicineImage}
+              src={medicine.imageUrl || medicine.medicineImage}
               alt={`${medicine.name} — original manufacturer packaging`}
               style={{ height: 300 }}
               placeholderSize={140}
             />
           </div>
-          {medicine.medicineImage && (
+          {(medicine.imageUrl || medicine.medicineImage) && (
             <p className="text-xs text-slate-400 mt-2 text-center">
               Click image to enlarge · Original photo uploaded by manufacturer at registration
             </p>
@@ -444,15 +460,16 @@ export default function VerifyResult() {
             Verified Packaging Specifications
           </h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
             <InfoCell label="Medicine Name" value={medicine.name} icon={Package} color="#0284C7" />
+            <InfoCell label="Active Formula" value={medicine.composition || "Standard Formula"} icon={FileText} color="#7C3AED" />
             <InfoCell label="Batch Number" value={medicine.batchId} icon={QrCode} color="#0D9488" />
             <InfoCell label="Manufacturer" value={medicine.company || medicine.manufacturer} icon={Building2} color="#0369A1" />
             <InfoCell label="Manufacturer Code" value={medicine.manufacturerCode} icon={FileText} color="#0F766E" />
+            <InfoCell label="Approval Status" value={(medicine.approvalStatus || "approved").toUpperCase()} icon={ShieldCheck} color="#059669" />
             <InfoCell label="Manufacturing Date" value={medicine.manufacturingDate} icon={Calendar} color="#059669" />
             <InfoCell label="Expiry Date" value={medicine.expiryDate} icon={Clock} color="#D97706" />
             <InfoCell label="MRP Price" value={medicine.price ? `₹${medicine.price}` : "—"} icon={DollarSign} color="#10B981" />
-            <InfoCell label="Batch Size" value={medicine.quantity ? `${medicine.quantity} units` : "—"} icon={Package} color="#0284C7" />
           </div>
         </section>
 

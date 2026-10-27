@@ -12,6 +12,7 @@ export const medicineService = {
     formData.append("expiryDate", medicineData.expiryDate || "");
     formData.append("price", medicineData.price || "");
     formData.append("quantity", medicineData.quantity || 1000);
+    formData.append("composition", medicineData.composition || "");
 
     if (medicineData.medicineFile) {
       formData.append("medicineImage", medicineData.medicineFile);
@@ -37,14 +38,50 @@ export const medicineService = {
     return res.data || res;
   },
 
-  async getAllMedicines() {
-    const res = await api.get("/medicines");
+  async getAllMedicines(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    const res = await api.get(`/medicines${query ? `?${query}` : ""}`);
     return res.data || [];
   },
 
   async getMedicineById(id) {
     const res = await api.get(`/medicines/${encodeURIComponent(id)}`);
     return res.data || null;
+  },
+
+  /**
+   * Admin / Creator: Fetch all pending medicine submissions
+   */
+  async getPendingMedicines() {
+    const res = await api.get("/creator/medicines/pending");
+    return res.data || [];
+  },
+
+  /**
+   * Admin / Creator: Fetch all medicines with status and search filters
+   */
+  async getCreatorMedicines(filters = {}) {
+    const query = new URLSearchParams(filters).toString();
+    const res = await api.get(`/creator/medicines${query ? `?${query}` : ""}`);
+    return res.data || [];
+  },
+
+  /**
+   * Admin / Creator: Approve a medicine submission on DrugChain
+   */
+  async approveMedicine(id) {
+    const res = await api.patch(`/creator/medicines/${encodeURIComponent(id)}/approve`);
+    return res;
+  },
+
+  /**
+   * Admin / Creator: Reject a medicine submission with mandatory reason
+   */
+  async rejectMedicine(id, rejectionReason) {
+    const res = await api.patch(`/creator/medicines/${encodeURIComponent(id)}/reject`, {
+      rejectionReason,
+    });
+    return res;
   },
 
   /**

@@ -280,10 +280,10 @@ export default function Distributor() {
                     <div key={t.id} style={{ background: "#FFFFFF", border: `1px solid ${c.border}`, borderRadius: 18, padding: "24px 28px", boxShadow: "0 4px 16px rgba(0,0,0,0.02)" }}>
 
                       {/* ── Manufacturer Medicine Image ── */}
-                      {t.medicineImage && (
+                      {(t.imageUrl || t.medicineImage) && (
                         <div style={{ marginBottom: 20, borderRadius: 12, overflow: "hidden", border: "1px solid #E2E8F0", maxHeight: 160 }}>
                           <MedicineImage
-                            src={t.medicineImage}
+                            src={t.imageUrl || t.medicineImage}
                             alt={t.medicineName}
                             style={{ height: 160 }}
                             placeholderSize={100}

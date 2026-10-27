@@ -286,8 +286,23 @@ const MedicineSchema = new mongoose.Schema(
     expiryDate: { type: String, required: true },
     price: { type: String, required: true },
     quantity: { type: Number, default: 1000 },
+    composition: { type: String, trim: true, default: "" },
     medicineImage: { type: String, default: null },
     governmentCertificate: { type: String, default: null },
+
+    // Admin Approval Lifecycle
+    approvalStatus: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
+      index: true,
+    },
+    submittedAt: { type: Date, default: Date.now },
+    approvedBy: { type: String, default: null },
+    approvedAt: { type: Date, default: null },
+    rejectedBy: { type: String, default: null },
+    rejectedAt: { type: Date, default: null },
+    rejectionReason: { type: String, default: "" },
     
     // Custody State & Role
     currentOwnerId: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
@@ -320,8 +335,8 @@ const MedicineSchema = new mongoose.Schema(
     },
     
     // Immutable Blockchain Proof Reference
-    blockchainTxHash: { type: String, required: true },
-    blockchainStatus: { type: String, default: "Confirmed" },
+    blockchainTxHash: { type: String, default: "" },
+    blockchainStatus: { type: String, default: "Pending Approval" },
     transferHistory: [TransferHistoryItemSchema],
   },
   { timestamps: true, collection: "medicines" }

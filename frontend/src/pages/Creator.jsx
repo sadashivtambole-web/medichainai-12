@@ -36,10 +36,13 @@ import {
   TriangleAlert,
   ChevronDown,
   ChevronRight,
+  Clock,
 } from "lucide-react";
 import Background from "../components/layout/Background";
+import MedicineImage from "../components/ui/MedicineImage";
 import { useApp } from "../context/AppContext";
 import { authService } from "../services/authService";
+import { medicineService } from "../services/medicineService";
 import api from "../services/api";
 import toast, { Toaster } from "react-hot-toast";
 
@@ -74,14 +77,22 @@ export default function Creator() {
   const [usersList, setUsersList] = useState([]);
   const [pendingList, setPendingList] = useState([]);
   const [medicinesList, setMedicinesList] = useState([]);
+  const [pendingMedicines, setPendingMedicines] = useState([]);
   const [transfersList, setTransfersList] = useState([]);
   const [chainBlocks, setChainBlocks] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Subtab for Approvals: "users" vs "medicines"
+  const [approvalSubTab, setApprovalSubTab] = useState("users");
 
   // Filters for User Management
   const [roleFilter, setRoleFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Filters for Medicine Management
+  const [medStatusFilter, setMedStatusFilter] = useState("ALL");
+  const [medSearchQuery, setMedSearchQuery] = useState("");
 
   // Role Section Filter for Approvals View
   const [approvalRoleTab, setApprovalRoleTab] = useState("ALL");
@@ -92,6 +103,12 @@ export default function Creator() {
   const [candidateOcrData, setCandidateOcrData] = useState(null);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [zoomPhotoUrl, setZoomPhotoUrl] = useState(null);
+
+  // Medicine Review Drawer / Modal States
+  const [selectedMedicineReview, setSelectedMedicineReview] = useState(null);
+  const [confirmApproveMed, setConfirmApproveMed] = useState(null);
+  const [rejectModalMed, setRejectModalMed] = useState(null);
+  const [medRejectReason, setMedRejectReason] = useState("");
 
   // Approval confirmation modal
   const [confirmApproveUser, setConfirmApproveUser] = useState(null);
@@ -117,14 +134,15 @@ export default function Creator() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [statsRes, pendingRes, usersRes, medsRes, transRes, chainRes] =
+      const [statsRes, pendingRes, usersRes, medsRes, transRes, chainRes, pendingMedsRes] =
         await Promise.allSettled([
           api.get("/creator/stats"),
           api.get("/creator/approvals"),
           api.get(`/creator/users?role=${roleFilter}&status=${statusFilter}&search=${searchQuery}`),
-          api.get("/medicines"),
+          medicineService.getCreatorMedicines(),
           api.get("/transfers/incoming"),
           api.get("/blockchain/chain"),
+          medicineService.getPendingMedicines(),
         ]);
 
       if (statsRes.status === "fulfilled" && statsRes.value?.data) {
@@ -136,14 +154,17 @@ export default function Creator() {
       if (usersRes.status === "fulfilled" && Array.isArray(usersRes.value?.data)) {
         setUsersList(usersRes.value.data);
       }
-      if (medsRes.status === "fulfilled" && Array.isArray(medsRes.value?.data)) {
-        setMedicinesList(medsRes.value.data);
+      if (medsRes.status === "fulfilled" && Array.isArray(medsRes.value)) {
+        setMedicinesList(medsRes.value);
       }
       if (transRes.status === "fulfilled" && Array.isArray(transRes.value?.data)) {
         setTransfersList(transRes.value.data);
       }
       if (chainRes.status === "fulfilled" && Array.isArray(chainRes.value?.data)) {
         setChainBlocks(chainRes.value.data);
+      }
+      if (pendingMedsRes.status === "fulfilled" && Array.isArray(pendingMedsRes.value)) {
+        setPendingMedicines(pendingMedsRes.value);
       }
     } catch (err) {
       console.warn("Data fetch note:", err.message);
@@ -309,14 +330,63 @@ export default function Creator() {
     }
   };
 
+  // Medicine Approvals
+  const handleConfirmApproveMed = async () => {
+    if (!confirmApproveMed) return;
+    setActionLoading(true);
+    try {
+      const res = await medicineService.approveMedicine(confirmApproveMed._id);
+      if (res.success) {
+        toast.success(`Medicine "${confirmApproveMed.name}" approved and minted to DrugChain!`);
+        setConfirmApproveMed(null);
+        setSelectedMedicineReview(null);
+        fetchData();
+      } else {
+        toast.error(res.message || "Medicine approval failed");
+      }
+    } catch (err) {
+      toast.error(err.message || "Network error during medicine approval.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleConfirmRejectMed = async () => {
+    if (!rejectModalMed) return;
+    const reason = medRejectReason.trim();
+    if (!reason || reason.length < 3) {
+      toast.error("Please enter a rejection reason (minimum 3 characters).");
+      return;
+    }
+    setActionLoading(true);
+    try {
+      const res = await medicineService.rejectMedicine(rejectModalMed._id, reason);
+      if (res.success) {
+        toast.success(`Medicine "${rejectModalMed.name}" rejected. Manufacturer notified.`);
+        setRejectModalMed(null);
+        setSelectedMedicineReview(null);
+        setMedRejectReason("");
+        fetchData();
+      } else {
+        toast.error(res.message || "Medicine rejection failed");
+      }
+    } catch (err) {
+      toast.error(err.message || "Network error during medicine rejection.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleLogout = () => {
     logout();
     navigate("/login");
   };
 
+  const totalPendingCount = (stats.pendingApprovals || pendingList.length) + (pendingMedicines.length || 0);
+
   const navTabs = [
     { id: "overview", label: "Overview Metrics", path: "/creator", icon: Layers },
-    { id: "approvals", label: `Pending Approvals (${stats.pendingApprovals})`, path: "/creator/approvals", icon: UserCheck },
+    { id: "approvals", label: `Pending Approvals (${totalPendingCount})`, path: "/creator/approvals", icon: UserCheck },
     { id: "users", label: "User Directory", path: "/creator/users", icon: Users },
     { id: "medicines", label: "Registered Medicines", path: "/creator/medicines", icon: Pill },
     { id: "transfers", label: "Active Transfers", path: "/creator/transfers", icon: Truck },
@@ -733,12 +803,61 @@ export default function Creator() {
           <div>
             <div style={{ marginBottom: 24 }}>
               <h1 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: "1.8rem", fontWeight: 800, color: "#18182E", marginBottom: 4 }}>
-                Candidate Identity Reviews & Approvals
+                Review & Approvals Center
               </h1>
               <p style={{ fontSize: 14, color: "#5F607A" }}>
-                Dedicated review queues for Manufacturers, Distributors, Pharmacies, and Public User accounts
+                Verify organization identities and inspect manufacturer medicine submissions before DrugChain registration
               </p>
             </div>
+
+            {/* Primary Approvals Switcher: User Accounts vs Medicine Batches */}
+            <div style={{ display: "flex", gap: 12, marginBottom: 24, borderBottom: "1px solid #E8EAF6", paddingBottom: 14 }}>
+              <button
+                type="button"
+                onClick={() => setApprovalSubTab("users")}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "10px 20px",
+                  borderRadius: 12,
+                  border: "none",
+                  fontWeight: 800,
+                  fontSize: 14,
+                  cursor: "pointer",
+                  background: approvalSubTab === "users" ? "#18182E" : "#F1F5F9",
+                  color: approvalSubTab === "users" ? "#FFFFFF" : "#5F607A",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                <Users size={16} />
+                User Registrations ({pendingList.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setApprovalSubTab("medicines")}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "10px 20px",
+                  borderRadius: 12,
+                  border: "none",
+                  fontWeight: 800,
+                  fontSize: 14,
+                  cursor: "pointer",
+                  background: approvalSubTab === "medicines" ? "#0284C7" : "#F1F5F9",
+                  color: approvalSubTab === "medicines" ? "#FFFFFF" : "#5F607A",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                <Pill size={16} />
+                Medicine Submissions ({pendingMedicines.length})
+              </button>
+            </div>
+
+            {approvalSubTab === "users" ? (
+              <div>
 
             {/* Role-Specific Section Tabs */}
             <div
@@ -1055,7 +1174,155 @@ export default function Creator() {
               );
             })()}
           </div>
+        ) : (
+          <div>
+            {pendingMedicines.length === 0 ? (
+              <div style={{ background: "#FFFFFF", borderRadius: 20, padding: "64px 24px", textAlign: "center", border: "1px solid #E8EAF6" }}>
+                <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#ECFDF5", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                  <CheckCircle2 size={32} color="#059669" />
+                </div>
+                <h3 style={{ fontSize: 18, fontWeight: 800, color: "#18182E", marginBottom: 6 }}>All Medicine Submissions Reviewed</h3>
+                <p style={{ fontSize: 13, color: "#5F607A", maxWidth: 440, margin: "0 auto" }}>
+                  There are no pending medicine registrations awaiting Creator approval at this time.
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gap: 16 }}>
+                {pendingMedicines.map((med) => (
+                  <div
+                    key={med._id}
+                    style={{
+                      background: "#FFFFFF",
+                      border: "1px solid #E8EAF6",
+                      borderRadius: 20,
+                      padding: "24px",
+                      display: "flex",
+                      flexWrap: "wrap",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 20,
+                      boxShadow: "0 4px 16px rgba(0,0,0,0.03)",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 18, flex: "1 1 340px" }}>
+                      <div
+                        style={{
+                          width: 76,
+                          height: 76,
+                          borderRadius: 14,
+                          overflow: "hidden",
+                          border: "1px solid #E2E8F0",
+                          background: "#F8FAFC",
+                          flexShrink: 0,
+                          cursor: "pointer",
+                        }}
+                        onClick={() => setSelectedMedicineReview(med)}
+                      >
+                        <MedicineImage
+                          src={med.imageUrl}
+                          alt={med.name}
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        />
+                      </div>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                          <h3 style={{ fontSize: 17, fontWeight: 800, color: "#18182E", margin: 0 }}>
+                            {med.name}
+                          </h3>
+                          <span style={{ fontSize: 11, fontWeight: 800, padding: "2px 8px", borderRadius: 100, background: "#FEF3C7", color: "#D97706" }}>
+                            Pending Review
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 13, color: "#5F607A", marginBottom: 4 }}>
+                          Batch: <strong style={{ fontFamily: "monospace", color: "#0284C7" }}>{med.batchId}</strong>
+                          {med.composition && <span> • Formula: <em>{med.composition}</em></span>}
+                        </div>
+                        <div style={{ fontSize: 12, color: "#8E8FA8" }}>
+                          Submitted by: <strong style={{ color: "#475569" }}>{med.companyName || med.manufacturer || med.manufacturerName || "Manufacturer"}</strong>
+                          {med.manufacturerEmail && ` (${med.manufacturerEmail})`}
+                          {med.createdAt && ` on ${new Date(med.createdAt).toLocaleDateString("en-IN")}`}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
+                      <div style={{ fontSize: 12, color: "#5F607A", textAlign: "right" }}>
+                        <div>Mfg: <strong style={{ color: "#18182E" }}>{med.mfgDate || "—"}</strong></div>
+                        <div>Exp: <strong style={{ color: "#18182E" }}>{med.expiryDate || "—"}</strong></div>
+                        {med.unitPrice ? <div>Price: <strong style={{ color: "#059669" }}>₹{med.unitPrice}</strong></div> : null}
+                      </div>
+
+                      <div style={{ display: "flex", gap: 10 }}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedMedicineReview(med)}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 6,
+                            padding: "9px 16px",
+                            borderRadius: 10,
+                            background: "#F1F5F9",
+                            border: "none",
+                            fontWeight: 700,
+                            fontSize: 12,
+                            color: "#334155",
+                            cursor: "pointer",
+                          }}
+                        >
+                          <Eye size={14} /> Review Details
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => { setRejectModalMed(med); setMedRejectReason(""); }}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 6,
+                            padding: "9px 16px",
+                            borderRadius: 10,
+                            background: "#FEF2F2",
+                            border: "1px solid #FECACA",
+                            fontWeight: 800,
+                            fontSize: 12,
+                            color: "#DC2626",
+                            cursor: "pointer",
+                          }}
+                        >
+                          <XCircle size={14} /> Reject
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setConfirmApproveMed(med)}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 6,
+                            padding: "9px 20px",
+                            borderRadius: 10,
+                            background: "#059669",
+                            border: "none",
+                            fontWeight: 800,
+                            fontSize: 12,
+                            color: "#FFFFFF",
+                            cursor: "pointer",
+                            boxShadow: "0 4px 12px rgba(5,150,105,0.25)",
+                          }}
+                        >
+                          <CheckCircle2 size={14} /> Approve & Mint
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
+      </div>
+    )}
 
         {/* ── VIEW 3: USER DIRECTORY & CREDENTIAL STATUS ── */}
         {activeTab === "users" && (
@@ -1266,44 +1533,253 @@ export default function Creator() {
                 Registered Medicines Inventory
               </h1>
               <p style={{ fontSize: 14, color: "#5F607A" }}>
-                Immutable medicine batches registered across the network on DrugChain
+                Inspect, verify, and monitor medicine batches across the entire DrugChain network
               </p>
             </div>
 
-            <div style={{ background: "#FFFFFF", border: "1px solid #E8EAF6", borderRadius: 20, overflow: "hidden" }}>
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
-                  <thead>
-                    <tr style={{ background: "#F8F9FE", borderBottom: "1px solid #E8EAF6" }}>
-                      <th style={{ padding: "14px 20px", fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: "#5F607A" }}>Medicine</th>
-                      <th style={{ padding: "14px 20px", fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: "#5F607A" }}>Batch ID</th>
-                      <th style={{ padding: "14px 20px", fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: "#5F607A" }}>Manufacturer</th>
-                      <th style={{ padding: "14px 20px", fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: "#5F607A" }}>Expiry Date</th>
-                      <th style={{ padding: "14px 20px", fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: "#5F607A" }}>Data Hash</th>
-                      <th style={{ padding: "14px 20px", fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: "#5F607A" }}>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {medicinesList.map((med) => (
-                      <tr key={med._id} style={{ borderBottom: "1px solid #F1F3FC" }}>
-                        <td style={{ padding: "14px 20px", fontWeight: 800, color: "#18182E", fontSize: 13 }}>{med.name}</td>
-                        <td style={{ padding: "14px 20px", fontFamily: "monospace", color: "#0284C7", fontWeight: 700, fontSize: 12 }}>{med.batchId}</td>
-                        <td style={{ padding: "14px 20px", fontSize: 12, color: "#5F607A" }}>{med.companyName || med.manufacturer}</td>
-                        <td style={{ padding: "14px 20px", fontSize: 12, color: "#5F607A" }}>{med.expiryDate}</td>
-                        <td style={{ padding: "14px 20px", fontFamily: "monospace", fontSize: 11, color: "#8E8FA8" }}>
-                          {med.medicineDataHash ? `${med.medicineDataHash.slice(0, 12)}...` : "—"}
-                        </td>
-                        <td style={{ padding: "14px 20px" }}>
-                          <span style={{ fontSize: 11, fontWeight: 800, padding: "3px 8px", borderRadius: 100, background: "#ECFDF5", color: "#059669" }}>
-                            {med.status || "Registered"}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            {/* Filter & Search Bar */}
+            <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {[
+                  { id: "ALL", label: `All Batches (${medicinesList.length})` },
+                  { id: "APPROVED", label: `Approved (${medicinesList.filter((m) => (m.approvalStatus || "approved") === "approved").length})`, color: "#059669" },
+                  { id: "PENDING", label: `Pending Review (${medicinesList.filter((m) => m.approvalStatus === "pending").length})`, color: "#D97706" },
+                  { id: "REJECTED", label: `Rejected (${medicinesList.filter((m) => m.approvalStatus === "rejected").length})`, color: "#DC2626" },
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setMedStatusFilter(f.id)}
+                    style={{
+                      padding: "8px 16px",
+                      borderRadius: 10,
+                      border: "none",
+                      fontSize: 13,
+                      fontWeight: 800,
+                      cursor: "pointer",
+                      background: medStatusFilter === f.id ? "#18182E" : "#FFFFFF",
+                      color: medStatusFilter === f.id ? "#FFFFFF" : f.color || "#5F607A",
+                      boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+                    }}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ position: "relative", minWidth: 260 }}>
+                <Search size={15} color="#8E8FA8" style={{ position: "absolute", left: 14, top: 11 }} />
+                <input
+                  type="text"
+                  placeholder="Search medicine, batch, manufacturer..."
+                  value={medSearchQuery}
+                  onChange={(e) => setMedSearchQuery(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "9px 14px 9px 38px",
+                    borderRadius: 10,
+                    border: "1px solid #E8EAF6",
+                    background: "#FFFFFF",
+                    fontSize: 13,
+                    boxSizing: "border-box",
+                  }}
+                />
               </div>
             </div>
+
+            {(() => {
+              const filteredMeds = medicinesList.filter((med) => {
+                const status = (med.approvalStatus || "approved").toUpperCase();
+                if (medStatusFilter !== "ALL" && status !== medStatusFilter) return false;
+                if (medSearchQuery.trim()) {
+                  const q = medSearchQuery.toLowerCase();
+                  const matchName = med.name?.toLowerCase().includes(q);
+                  const matchBatch = med.batchId?.toLowerCase().includes(q);
+                  const matchMfg = (med.companyName || med.manufacturer || "").toLowerCase().includes(q);
+                  const matchComp = (med.composition || "").toLowerCase().includes(q);
+                  return matchName || matchBatch || matchMfg || matchComp;
+                }
+                return true;
+              });
+
+              if (filteredMeds.length === 0) {
+                return (
+                  <div style={{ background: "#FFFFFF", borderRadius: 20, padding: "50px 20px", textAlign: "center", border: "1px solid #E8EAF6" }}>
+                    <Pill size={36} color="#94A3B8" style={{ margin: "0 auto 12px" }} />
+                    <h3 style={{ fontSize: 16, fontWeight: 700, color: "#18182E", marginBottom: 4 }}>No Medicines Found</h3>
+                    <p style={{ fontSize: 13, color: "#64748B" }}>Try adjusting your status filter or search query.</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div style={{ background: "#FFFFFF", border: "1px solid #E8EAF6", borderRadius: 20, overflow: "hidden", boxShadow: "0 4px 20px rgba(0,0,0,0.02)" }}>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+                      <thead>
+                        <tr style={{ background: "#F8F9FE", borderBottom: "1px solid #E8EAF6" }}>
+                          <th style={{ padding: "14px 20px", fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: "#5F607A" }}>Medicine & Image</th>
+                          <th style={{ padding: "14px 20px", fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: "#5F607A" }}>Batch ID</th>
+                          <th style={{ padding: "14px 20px", fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: "#5F607A" }}>Manufacturer</th>
+                          <th style={{ padding: "14px 20px", fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: "#5F607A" }}>Dates</th>
+                          <th style={{ padding: "14px 20px", fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: "#5F607A" }}>Approval Status</th>
+                          <th style={{ padding: "14px 20px", fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: "#5F607A" }}>DrugChain Ledger</th>
+                          <th style={{ padding: "14px 20px", fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: "#5F607A", textAlign: "right" }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredMeds.map((med) => {
+                          const appStatus = med.approvalStatus || "approved";
+                          return (
+                            <tr key={med._id} style={{ borderBottom: "1px solid #F1F3FC" }}>
+                              <td style={{ padding: "14px 20px" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                                  <div
+                                    style={{
+                                      width: 48,
+                                      height: 48,
+                                      borderRadius: 10,
+                                      overflow: "hidden",
+                                      background: "#F8FAFC",
+                                      border: "1px solid #E2E8F0",
+                                      flexShrink: 0,
+                                      cursor: "pointer",
+                                    }}
+                                    onClick={() => setSelectedMedicineReview(med)}
+                                  >
+                                    <MedicineImage
+                                      src={med.imageUrl}
+                                      alt={med.name}
+                                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                    />
+                                  </div>
+                                  <div>
+                                    <div style={{ fontWeight: 800, color: "#18182E", fontSize: 14 }}>{med.name}</div>
+                                    <div style={{ fontSize: 11, color: "#64748B" }}>
+                                      {med.composition ? med.composition : "Standard Formula"}
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+
+                              <td style={{ padding: "14px 20px", fontFamily: "monospace", color: "#0284C7", fontWeight: 700, fontSize: 12 }}>
+                                {med.batchId}
+                              </td>
+
+                              <td style={{ padding: "14px 20px", fontSize: 12, color: "#475569" }}>
+                                <div style={{ fontWeight: 600 }}>{med.companyName || med.manufacturer || med.manufacturerName || "—"}</div>
+                                {med.manufacturerEmail && <div style={{ fontSize: 11, color: "#8E8FA8" }}>{med.manufacturerEmail}</div>}
+                              </td>
+
+                              <td style={{ padding: "14px 20px", fontSize: 12, color: "#5F607A" }}>
+                                <div>Exp: <strong>{med.expiryDate || "—"}</strong></div>
+                                {med.mfgDate && <div style={{ fontSize: 11, color: "#8E8FA8" }}>Mfg: {med.mfgDate}</div>}
+                              </td>
+
+                              <td style={{ padding: "14px 20px" }}>
+                                {appStatus === "approved" && (
+                                  <span style={{ fontSize: 11, fontWeight: 800, padding: "4px 10px", borderRadius: 100, background: "#ECFDF5", color: "#059669", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                                    <CheckCircle2 size={12} /> Approved
+                                  </span>
+                                )}
+                                {appStatus === "pending" && (
+                                  <span style={{ fontSize: 11, fontWeight: 800, padding: "4px 10px", borderRadius: 100, background: "#FEF3C7", color: "#D97706", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                                    <Clock size={12} /> Pending Review
+                                  </span>
+                                )}
+                                {appStatus === "rejected" && (
+                                  <div>
+                                    <span style={{ fontSize: 11, fontWeight: 800, padding: "4px 10px", borderRadius: 100, background: "#FEF2F2", color: "#DC2626", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                                      <XCircle size={12} /> Rejected
+                                    </span>
+                                    {med.rejectionReason && (
+                                      <div style={{ fontSize: 11, color: "#EF4444", marginTop: 4, maxWidth: 180 }}>
+                                        {med.rejectionReason}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </td>
+
+                              <td style={{ padding: "14px 20px", fontFamily: "monospace", fontSize: 11 }}>
+                                {med.blockchainTxHash ? (
+                                  <span style={{ color: "#059669", fontWeight: 700 }}>
+                                    Tx: {med.blockchainTxHash.slice(0, 10)}...
+                                  </span>
+                                ) : (
+                                  <span style={{ color: "#94A3B8" }}>Not Minted</span>
+                                )}
+                              </td>
+
+                              <td style={{ padding: "14px 20px", textAlign: "right" }}>
+                                <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedMedicineReview(med)}
+                                    style={{
+                                      padding: "6px 12px",
+                                      borderRadius: 8,
+                                      background: "#F1F5F9",
+                                      border: "none",
+                                      fontSize: 12,
+                                      fontWeight: 700,
+                                      color: "#334155",
+                                      cursor: "pointer",
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: 4,
+                                    }}
+                                  >
+                                    <Eye size={12} /> Review
+                                  </button>
+
+                                  {appStatus === "pending" && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => setConfirmApproveMed(med)}
+                                        style={{
+                                          padding: "6px 12px",
+                                          borderRadius: 8,
+                                          background: "#059669",
+                                          color: "#FFFFFF",
+                                          border: "none",
+                                          fontSize: 12,
+                                          fontWeight: 800,
+                                          cursor: "pointer",
+                                        }}
+                                      >
+                                        Approve
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => { setRejectModalMed(med); setMedRejectReason(""); }}
+                                        style={{
+                                          padding: "6px 10px",
+                                          borderRadius: 8,
+                                          background: "#FEF2F2",
+                                          color: "#DC2626",
+                                          border: "1px solid #FECACA",
+                                          fontSize: 12,
+                                          fontWeight: 800,
+                                          cursor: "pointer",
+                                        }}
+                                      >
+                                        Reject
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -2110,30 +2586,411 @@ export default function Creator() {
         </div>
       )}
 
-      {/* ── PHOTO ZOOM MODAL ── */}
-      {zoomPhotoUrl && (
+      {/* ── MEDICINE REVIEW DRAWER / MODAL ── */}
+      {selectedMedicineReview && (
         <div
-          onClick={() => setZoomPhotoUrl(null)}
           style={{
             position: "fixed",
             top: 0,
             left: 0,
             right: 0,
             bottom: 0,
-            background: "rgba(0,0,0,0.85)",
-            zIndex: 1200,
+            background: "rgba(15,23,42,0.65)",
+            backdropFilter: "blur(4px)",
+            zIndex: 1050,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             padding: 20,
-            cursor: "zoom-out",
           }}
         >
-          <img
-            src={zoomPhotoUrl}
-            alt="Zoomed Identity"
-            style={{ maxWidth: "90%", maxHeight: "90%", borderRadius: 12, boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}
-          />
+          <div
+            style={{
+              background: "#FFFFFF",
+              borderRadius: 24,
+              maxWidth: 720,
+              width: "100%",
+              maxHeight: "90vh",
+              overflowY: "auto",
+              padding: "28px 32px",
+              boxShadow: "0 24px 70px rgba(15,23,42,0.25)",
+              border: "1px solid #E2E8F0",
+            }}
+          >
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20, borderBottom: "1px solid #E8EAF6", paddingBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: "#F0F9FF", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Pill size={24} color="#0284C7" />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: 20, fontWeight: 800, color: "#18182E", margin: 0 }}>
+                    {selectedMedicineReview.name}
+                  </h2>
+                  <div style={{ fontSize: 13, color: "#5F607A", marginTop: 2 }}>
+                    Batch <strong style={{ fontFamily: "monospace", color: "#0284C7" }}>{selectedMedicineReview.batchId}</strong>
+                    {selectedMedicineReview.approvalStatus && (
+                      <span
+                        style={{
+                          marginLeft: 8,
+                          fontSize: 11,
+                          fontWeight: 800,
+                          padding: "2px 8px",
+                          borderRadius: 100,
+                          background:
+                            selectedMedicineReview.approvalStatus === "approved"
+                              ? "#ECFDF5"
+                              : selectedMedicineReview.approvalStatus === "rejected"
+                              ? "#FEF2F2"
+                              : "#FEF3C7",
+                          color:
+                            selectedMedicineReview.approvalStatus === "approved"
+                              ? "#059669"
+                              : selectedMedicineReview.approvalStatus === "rejected"
+                              ? "#DC2626"
+                              : "#D97706",
+                        }}
+                      >
+                        {(selectedMedicineReview.approvalStatus || "approved").toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedMedicineReview(null)}
+                style={{ background: "#F1F5F9", border: "none", borderRadius: 10, width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+              >
+                <X size={18} color="#475569" />
+              </button>
+            </div>
+
+            {/* Medicine Image & Primary Details */}
+            <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 24, marginBottom: 24 }}>
+              <div style={{ borderRadius: 14, overflow: "hidden", border: "1px solid #E2E8F0", background: "#F8FAFC", height: 220, position: "relative" }}>
+                <MedicineImage
+                  src={selectedMedicineReview.imageUrl}
+                  alt={selectedMedicineReview.name}
+                  style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                />
+              </div>
+
+              <div style={{ display: "grid", gap: 10, fontSize: 13 }}>
+                <div>
+                  <span style={{ color: "#64748B", display: "block", fontSize: 11, textTransform: "uppercase", fontWeight: 700 }}>Active Composition / Formula</span>
+                  <strong style={{ color: "#18182E", fontSize: 14 }}>{selectedMedicineReview.composition || "Standard Formula"}</strong>
+                </div>
+                <div>
+                  <span style={{ color: "#64748B", display: "block", fontSize: 11, textTransform: "uppercase", fontWeight: 700 }}>Manufacturer Organization</span>
+                  <strong style={{ color: "#18182E" }}>{selectedMedicineReview.companyName || selectedMedicineReview.manufacturer || selectedMedicineReview.manufacturerName}</strong>
+                  {selectedMedicineReview.manufacturerEmail && <span style={{ color: "#8E8FA8", marginLeft: 6 }}>({selectedMedicineReview.manufacturerEmail})</span>}
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div>
+                    <span style={{ color: "#64748B", display: "block", fontSize: 11, textTransform: "uppercase", fontWeight: 700 }}>Manufacturing Date</span>
+                    <strong style={{ color: "#18182E" }}>{selectedMedicineReview.mfgDate || "—"}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: "#64748B", display: "block", fontSize: 11, textTransform: "uppercase", fontWeight: 700 }}>Expiry Date</span>
+                    <strong style={{ color: "#18182E" }}>{selectedMedicineReview.expiryDate || "—"}</strong>
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div>
+                    <span style={{ color: "#64748B", display: "block", fontSize: 11, textTransform: "uppercase", fontWeight: 700 }}>Unit Price</span>
+                    <strong style={{ color: "#059669" }}>₹{selectedMedicineReview.unitPrice || 0}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: "#64748B", display: "block", fontSize: 11, textTransform: "uppercase", fontWeight: 700 }}>Batch Quantity</span>
+                    <strong style={{ color: "#18182E" }}>{selectedMedicineReview.quantity || 0} units</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Cryptographic & Compliance Details */}
+            <div style={{ background: "#F8F9FE", borderRadius: 14, padding: "16px 20px", marginBottom: 24, border: "1px solid #E8EAF6" }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#18182E", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                <ShieldCheck size={15} color="#0284C7" /> Cryptographic Integrity & Ledger Info
+              </div>
+              <div style={{ display: "grid", gap: 6, fontSize: 12, fontFamily: "monospace", color: "#5F607A" }}>
+                <div><span style={{ color: "#8E8FA8" }}>Data Hash:</span> {selectedMedicineReview.medicineDataHash || "Generated at submission"}</div>
+                <div><span style={{ color: "#8E8FA8" }}>Ledger Tx:</span> {selectedMedicineReview.blockchainTxHash || "Awaiting Admin Approval for minting"}</div>
+                {selectedMedicineReview.rejectionReason && (
+                  <div style={{ color: "#DC2626", marginTop: 4 }}>
+                    <span style={{ fontWeight: 700 }}>Rejection Reason:</span> {selectedMedicineReview.rejectionReason}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                onClick={() => setSelectedMedicineReview(null)}
+                style={{ padding: "10px 20px", borderRadius: 10, background: "#F1F5F9", border: "none", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+              >
+                Close
+              </button>
+
+              {selectedMedicineReview.approvalStatus === "pending" && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRejectModalMed(selectedMedicineReview);
+                      setMedRejectReason("");
+                    }}
+                    style={{
+                      padding: "10px 20px",
+                      borderRadius: 10,
+                      background: "#FEF2F2",
+                      border: "1px solid #FECACA",
+                      color: "#DC2626",
+                      fontWeight: 800,
+                      fontSize: 13,
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <XCircle size={15} /> Reject Submission
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setConfirmApproveMed(selectedMedicineReview)}
+                    style={{
+                      padding: "10px 24px",
+                      borderRadius: 10,
+                      background: "#059669",
+                      border: "none",
+                      color: "#FFFFFF",
+                      fontWeight: 800,
+                      fontSize: 13,
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      boxShadow: "0 4px 14px rgba(5,150,105,0.3)",
+                    }}
+                  >
+                    <CheckCircle2 size={15} /> Approve & Mint to DrugChain
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MEDICINE APPROVAL CONFIRMATION MODAL ── */}
+      {confirmApproveMed && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.7)",
+            zIndex: 1100,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              background: "#FFFFFF",
+              borderRadius: 20,
+              maxWidth: 480,
+              width: "100%",
+              padding: "28px 24px",
+              textAlign: "center",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+            }}
+          >
+            <div
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: "50%",
+                background: "#ECFDF5",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto 16px",
+              }}
+            >
+              <ShieldCheck size={28} color="#059669" />
+            </div>
+
+            <h3 style={{ fontSize: 18, fontWeight: 800, color: "#18182E", marginBottom: 8 }}>
+              Approve Medicine Batch?
+            </h3>
+
+            <p style={{ fontSize: 13, color: "#5F607A", lineHeight: 1.6, marginBottom: 20 }}>
+              You are approving <strong>{confirmApproveMed.name}</strong> (Batch: <code>{confirmApproveMed.batchId}</code>). This will mint an immutable DrugChain block, release the batch to authorized supply-chain distributors, and dispatch an approval confirmation email to the manufacturer.
+            </p>
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setConfirmApproveMed(null)}
+                style={{ flex: 1, padding: "10px", background: "#F1F5F9", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer" }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={handleConfirmApproveMed}
+                style={{
+                  flex: 1,
+                  padding: "10px",
+                  background: "#059669",
+                  color: "#FFFFFF",
+                  border: "none",
+                  borderRadius: 8,
+                  fontWeight: 800,
+                  fontSize: 13,
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                }}
+              >
+                {actionLoading ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                {actionLoading ? "Minting to DrugChain..." : "Approve & Mint"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MEDICINE REJECTION MODAL ── */}
+      {rejectModalMed && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.7)",
+            zIndex: 1100,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              background: "#FFFFFF",
+              borderRadius: 20,
+              maxWidth: 480,
+              width: "100%",
+              padding: "28px 24px",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+              <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#FEF2F2", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <AlertTriangle size={20} color="#DC2626" />
+              </div>
+              <div>
+                <h3 style={{ fontSize: 17, fontWeight: 800, color: "#18182E", margin: 0 }}>
+                  Reject Medicine Submission
+                </h3>
+                <div style={{ fontSize: 12, color: "#64748B" }}>
+                  {rejectModalMed.name} (Batch: {rejectModalMed.batchId})
+                </div>
+              </div>
+            </div>
+
+            <p style={{ fontSize: 13, color: "#5F607A", marginBottom: 14 }}>
+              Select a reason or enter specific compliance feedback. This reason will be recorded in the audit trail and sent to the manufacturer.
+            </p>
+
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
+              {[
+                "Packaging image unclear or unverified",
+                "Batch number format invalid or already exists",
+                "Active chemical composition details incomplete",
+                "Manufacturing or expiry dates outside valid range",
+                "Manufacturer licensing verification required",
+              ].map((reasonText) => (
+                <button
+                  key={reasonText}
+                  type="button"
+                  onClick={() => setMedRejectReason(reasonText)}
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    padding: "5px 10px",
+                    borderRadius: 6,
+                    background: medRejectReason === reasonText ? "#FEF2F2" : "#F8F9FE",
+                    border: `1px solid ${medRejectReason === reasonText ? "#FECACA" : "#E8EAF6"}`,
+                    color: medRejectReason === reasonText ? "#DC2626" : "#5F607A",
+                    cursor: "pointer",
+                  }}
+                >
+                  {reasonText}
+                </button>
+              ))}
+            </div>
+
+            <textarea
+              rows={3}
+              value={medRejectReason}
+              onChange={(e) => setMedRejectReason(e.target.value)}
+              placeholder="Enter rejection explanation for the manufacturer..."
+              style={{
+                width: "100%",
+                padding: "10px",
+                borderRadius: 10,
+                border: "1px solid #E8EAF6",
+                fontSize: 13,
+                boxSizing: "border-box",
+                marginBottom: 16,
+              }}
+            />
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setRejectModalMed(null)}
+                style={{ flex: 1, padding: "10px", background: "#F1F5F9", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer" }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={handleConfirmRejectMed}
+                style={{
+                  flex: 1,
+                  padding: "10px",
+                  background: "#DC2626",
+                  color: "#FFFFFF",
+                  border: "none",
+                  borderRadius: 8,
+                  fontWeight: 800,
+                  fontSize: 13,
+                  cursor: "pointer",
+                }}
+              >
+                {actionLoading ? "Rejecting..." : "Confirm Rejection"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

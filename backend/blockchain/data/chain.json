@@ -7392,5 +7392,62 @@
     "hash": "fda27566e7e668a752362b8447209aaf0ca6642e701703926f20bc05b1db74ec",
     "merkleRoot": "92c5a00013202bea20208f24e875096db0403632d62e92f4ebd321fb1cde852b",
     "validator": "validator-manufacturer"
+  },
+  {
+    "index": 267,
+    "timestamp": "2026-10-27T16:01:04.745Z",
+    "transactions": [
+      {
+        "transactionId": "tx-f959158868ff471e-mvqvhfqg",
+        "type": "MEDICINE_REGISTERED",
+        "medicineId": "MED-2026-VHFFT42",
+        "batchNumber": "E2E-BT-1793116864111",
+        "from": null,
+        "to": "BioPharma Ltd",
+        "timestamp": "2026-10-27T16:01:04.744Z",
+        "dataHash": "bac5c8fcf9b3db10b7d5ee9e4ee300a26bdf143c8c0a50d69bad34e54bcf1b01",
+        "metadata": {
+          "medicineName": "CardioGuard XR",
+          "manufacturerCode": "MFR-BIO-001",
+          "manufacturerName": "BioPharma Ltd",
+          "manufacturingDate": "2026-01-15",
+          "expiryDate": "2028-01-15",
+          "role": "Manufacturer"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "fda27566e7e668a752362b8447209aaf0ca6642e701703926f20bc05b1db74ec",
+    "hash": "b1d6a1daec3b810012cf7f9c9c0f25e65d6e6c1f437965f7677387199ac63b9b",
+    "merkleRoot": "815c1aab26377d9deb4455e3af36900cb6fcdadbca2c623a58d10cd65dd932b3",
+    "validator": "validator-authority-root"
+  },
+  {
+    "index": 268,
+    "timestamp": "2026-10-27T16:01:04.878Z",
+    "transactions": [
+      {
+        "transactionId": "tx-e2e4a346dedb2f12-mvqvhfu6",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2026-VHFFT42",
+        "batchNumber": "E2E-BT-1793116864111",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-10-27T16:01:04.877Z",
+        "dataHash": "4cee8c6026899a7d3e8ad56d74718d545e699fb46da71d8b6397613ed173a9ed",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "bac5c8fcf9b3db10b7d5ee9e4ee300a26bdf143c8c0a50d69bad34e54bcf1b01",
+          "registeredHash": "bac5c8fcf9b3db10b7d5ee9e4ee300a26bdf143c8c0a50d69bad34e54bcf1b01"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "b1d6a1daec3b810012cf7f9c9c0f25e65d6e6c1f437965f7677387199ac63b9b",
+    "hash": "c8c2ea24eb823c6857cbd62ac9890f7e290a69d999ce7b3c21e3740a5f49a886",
+    "merkleRoot": "976b0a199fb496cf4e1aa22d9439c769035f5e1d07a1398d4f8aaf272a318e59",
+    "validator": "validator-admin"
   }
 ]
