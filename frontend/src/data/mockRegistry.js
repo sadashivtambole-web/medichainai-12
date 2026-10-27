@@ -1,6 +1,9 @@
-// Sample registry of authentic medicine packs.
-// In production this data lives on-chain / behind the API — see src/lib/verifyPack.js.
-// Each key is the exact string encoded in the pack's QR code.
+// ============================================================================
+// MediChainAI Demonstration Reference Codes
+// NOTE: Actual live medicine verification in MediChainAI queries the live Express
+// backend and MongoDB blockchain ledger. The records below serve solely as
+// fallback reference codes for offline demonstration testing.
+// ============================================================================
 export const mockRegistry = {
   'MEDG-AMOX-500-A1B2': {
     name: 'Amoxicillin 500mg',

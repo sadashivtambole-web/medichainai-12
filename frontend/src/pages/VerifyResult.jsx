@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import {
   ShieldCheck,
   CheckCircle2,
@@ -7,17 +8,12 @@ import {
   XCircle,
   Clock,
   ArrowLeft,
-  ExternalLink,
   Loader2,
   Copy,
   Check,
-  Share2,
   FileText,
-  AlertCircle,
   ShieldAlert,
   Building2,
-  Truck,
-  Store,
   QrCode,
   Calendar,
   DollarSign,
@@ -26,6 +22,7 @@ import {
 import Background from "../components/layout/Background";
 import Header from "../components/layout/Header";
 import StatusBadge from "../components/ui/StatusBadge";
+import MedicineImage from "../components/ui/MedicineImage";
 import { verificationService } from "../services/verificationService";
 import toast, { Toaster } from "react-hot-toast";
 
@@ -42,34 +39,25 @@ function VerifyRow({ label, status }) {
     status === "PARTIAL_MATCH" ||
     status === "MEDIUM" ||
     status === "ANOMALY_DETECTED";
-  const isBad =
-    status === "MISMATCH" ||
-    status === "DATA_INTEGRITY_MISMATCH" ||
-    status === "EXPIRED" ||
-    status === "NOT_FOUND" ||
-    status === "INVALID" ||
-    status === "HIGH" ||
-    status === "SUSPICIOUS" ||
-    status === "INVALID_SIGNATURE" ||
-    status === "NOT_FOUND_UNREGISTERED" ||
-    status === "FAILED_NO_CRYPTOGRAPHIC_PROOF" ||
-    status === "UNVERIFIED_NOT_ON_CHAIN" ||
-    status === "UNKNOWN_UNREGISTERED_BATCH" ||
-    status === "UNAUTHORIZED_NO_CUSTODY_RECORD" ||
-    status === "HIGH_RISK_SUSPECTED_COUNTERFEIT";
 
-  const color = isGood ? "#10B981" : isWarning ? "#F59E0B" : "#EF4444";
+  const color = isGood ? "#059669" : isWarning ? "#D97706" : "#DC2626";
   const bg = isGood
-    ? "rgba(16,185,129,0.08)"
+    ? "#ECFDF5"
     : isWarning
-    ? "rgba(245,158,11,0.08)"
-    : "rgba(239,68,68,0.08)";
+    ? "#FFFBEB"
+    : "#FEF2F2";
+  const border = isGood
+    ? "#A7F3D0"
+    : isWarning
+    ? "#FDE68A"
+    : "#FECACA";
+
   const icon = isGood ? (
-    <CheckCircle2 size={18} color={color} />
+    <CheckCircle2 size={16} color={color} />
   ) : isWarning ? (
-    <AlertTriangle size={18} color={color} />
+    <AlertTriangle size={16} color={color} />
   ) : (
-    <XCircle size={18} color={color} />
+    <XCircle size={16} color={color} />
   );
 
   return (
@@ -78,49 +66,49 @@ function VerifyRow({ label, status }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "14px 18px",
-        borderRadius: 14,
+        padding: "12px 16px",
+        borderRadius: 12,
         background: bg,
-        border: `1px solid ${color}30`,
+        border: `1px solid ${border}`,
         transition: "all 0.2s",
       }}
     >
-      <span style={{ fontSize: 14, fontWeight: 700, color: "#18182E" }}>{label}</span>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <span style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>{label}</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         {icon}
-        <span style={{ fontSize: 13, fontWeight: 800, color, letterSpacing: "0.02em" }}>{status}</span>
+        <span style={{ fontSize: 12, fontWeight: 800, color, letterSpacing: "0.02em" }}>{status}</span>
       </div>
     </div>
   );
 }
 
-function InfoCell({ label, value, icon: Icon, color = "#5855F3" }) {
+function InfoCell({ label, value, icon: Icon, color = "#0284C7" }) {
   return (
     <div
       style={{
-        padding: "16px 20px",
+        padding: "16px 18px",
         borderRadius: 14,
-        background: "#F8F9FD",
-        border: "1px solid #E8EAF6",
+        background: "#F8FAFC",
+        border: "1px solid #E2E8F0",
         display: "flex",
         alignItems: "center",
-        gap: 14,
+        gap: 12,
       }}
     >
       {Icon && (
         <div
           style={{
-            width: 40,
-            height: 40,
+            width: 38,
+            height: 38,
             borderRadius: 10,
-            background: `${color}15`,
+            background: `${color}12`,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             flexShrink: 0,
           }}
         >
-          <Icon size={20} color={color} />
+          <Icon size={18} color={color} />
         </div>
       )}
       <div>
@@ -128,15 +116,15 @@ function InfoCell({ label, value, icon: Icon, color = "#5855F3" }) {
           style={{
             fontSize: 11,
             fontWeight: 800,
-            color: "#8E8FA8",
+            color: "#64748B",
             textTransform: "uppercase",
-            letterSpacing: "0.06em",
-            marginBottom: 3,
+            letterSpacing: "0.05em",
+            marginBottom: 2,
           }}
         >
           {label}
         </div>
-        <div style={{ fontSize: 15, fontWeight: 800, color: "#18182E" }}>{value || "—"}</div>
+        <div style={{ fontSize: 14, fontWeight: 800, color: "#0F172A" }}>{value || "—"}</div>
       </div>
     </div>
   );
@@ -190,15 +178,15 @@ export default function VerifyResult() {
 
   if (loading) {
     return (
-      <div className="page-bg" style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div className="page-bg min-h-screen flex items-center justify-center">
         <Background />
-        <div style={{ position: "relative", zIndex: 1, textAlign: "center" }}>
-          <Loader2 size={46} color="#5855F3" style={{ margin: "0 auto 18px", animation: "spin 1s linear infinite" }} />
-          <h2 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: "1.9rem", color: "#18182E", marginBottom: 6 }}>
-            Real-Time Blockchain Verification in Progress...
+        <div className="relative z-10 text-center max-w-md mx-auto px-4">
+          <Loader2 size={42} className="text-sky-600 animate-spin mx-auto mb-4" />
+          <h2 className="font-extrabold text-2xl text-slate-900 mb-2 tracking-tight">
+            Cryptographic Audit in Progress...
           </h2>
-          <p style={{ fontSize: 14, color: "#5F607A" }}>
-            Executing 6-layer cryptographic audit, digital signature check, and supply-chain anomaly validation
+          <p className="text-xs text-slate-500 leading-relaxed">
+            Executing 6-layer blockchain consensus verification, digital signature integrity check, and supply chain provenance validation.
           </p>
         </div>
       </div>
@@ -227,164 +215,73 @@ export default function VerifyResult() {
     };
 
     return (
-      <div className="page-bg" style={{ minHeight: "100vh" }}>
+      <div className="page-bg min-h-screen text-slate-900">
         <Background />
         <Header />
         <Toaster position="top-right" />
 
-        <main style={{ position: "relative", zIndex: 1, width: "100%", maxWidth: 1280, margin: "0 auto", padding: "108px 36px 80px" }}>
+        <main className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-16">
           {/* Back Button */}
           <button
             onClick={() => navigate("/customer")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              background: "#FFFFFF",
-              border: "1px solid #E8EAF6",
-              borderRadius: 10,
-              padding: "9px 18px",
-              cursor: "pointer",
-              color: "#18182E",
-              fontSize: 13,
-              fontWeight: 700,
-              marginBottom: 32,
-              boxShadow: "0 2px 6px rgba(0,0,0,0.02)",
-            }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:text-sky-600 mb-6 shadow-sm"
           >
-            <ArrowLeft size={16} /> Scan Another Code
+            <ArrowLeft size={14} /> Scan Another Code
           </button>
 
           {/* FAKE DRUG SECURITY HERO ALERT */}
-          <div
-            style={{
-              textAlign: "center",
-              marginBottom: 32,
-              padding: "44px 32px",
-              borderRadius: 24,
-              background: "#FFFFFF",
-              border: "2px solid #FECACA",
-              boxShadow: "0 10px 40px rgba(220, 38, 38, 0.12)",
-            }}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-center bg-white rounded-3xl border-2 border-rose-200 p-8 sm:p-12 shadow-xl shadow-rose-900/5 mb-8"
           >
-            <div
-              style={{
-                width: 80,
-                height: 80,
-                borderRadius: "50%",
-                background: "#FEF2F2",
-                border: "2px solid #FCA5A5",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                margin: "0 auto 20px",
-                color: "#DC2626",
-                boxShadow: "0 0 30px rgba(220, 38, 38, 0.25)",
-              }}
-            >
-              <ShieldAlert size={44} />
+            <div className="w-18 h-18 w-16 h-16 rounded-full bg-rose-50 border-2 border-rose-300 flex items-center justify-center mx-auto mb-4 text-rose-600 shadow-md shadow-rose-600/20">
+              <ShieldAlert size={36} />
             </div>
 
-            <span
-              style={{
-                fontSize: 13,
-                fontWeight: 800,
-                padding: "6px 18px",
-                borderRadius: 100,
-                background: "#FEF2F2",
-                color: "#DC2626",
-                border: "1px solid #FECACA",
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-              }}
-            >
+            <span className="inline-block px-3.5 py-1 rounded-full bg-rose-50 border border-rose-200 text-rose-700 text-xs font-extrabold uppercase tracking-wider mb-3">
               🚨 Critical Alert: Counterfeit / Fake Drug Detected
             </span>
 
-            <h1
-              style={{
-                fontFamily: "'Plus Jakarta Sans', sans-serif",
-                fontSize: "2.3rem",
-                fontWeight: 800,
-                color: "#991B1B",
-                marginTop: 18,
-                marginBottom: 8,
-              }}
-            >
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-rose-900 tracking-tight mb-2">
               Unverified / Counterfeit Medicine
             </h1>
 
-            <p style={{ fontSize: 14, color: "#7F1D1D", maxWidth: 640, margin: "0 auto 20px", lineHeight: 1.6 }}>
-              The queried code <strong>"{id}"</strong> is <strong>NOT registered</strong> on the immutable DrugChain ledger. 
-              No authorized manufacturer batch or cryptographic signature exists for this identifier.
+            <p className="text-xs sm:text-sm text-rose-800 max-w-xl mx-auto mb-6 leading-relaxed">
+              The queried identifier <strong>"{id}"</strong> is <strong>NOT registered</strong> on the immutable DrugChain ledger. 
+              No authorized manufacturer batch or cryptographic signature exists for this code.
             </p>
 
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 24,
-                padding: "12px 24px",
-                borderRadius: 14,
-                background: "#FEF2F2",
-                border: "1px solid #FECACA",
-              }}
-            >
-              <div style={{ fontSize: 13, color: "#991B1B" }}>
-                Authenticity Score: <strong style={{ color: "#DC2626", fontSize: 16 }}>0% (FAKE)</strong>
-              </div>
-              <div style={{ fontSize: 13, color: "#991B1B" }}>
-                Detection Confidence: <strong style={{ color: "#991B1B", fontSize: 16 }}>99%</strong>
-              </div>
-              <div style={{ fontSize: 13, color: "#991B1B" }}>
-                Registry Status: <strong style={{ color: "#DC2626", fontSize: 16 }}>NOT FOUND</strong>
-              </div>
+            <div className="flex flex-wrap items-center justify-center gap-4 py-2.5 px-5 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-800 font-semibold inline-flex">
+              <div>Authenticity Score: <strong className="text-rose-600 font-bold">0% (FAKE)</strong></div>
+              <div className="text-rose-300 hidden sm:inline">|</div>
+              <div>Detection Confidence: <strong>99%</strong></div>
+              <div className="text-rose-300 hidden sm:inline">|</div>
+              <div>Ledger Status: <strong className="text-rose-600 font-bold">NOT FOUND</strong></div>
             </div>
 
             {/* Consumer Safety Warning */}
-            <div
-              style={{
-                marginTop: 28,
-                padding: "20px 24px",
-                borderRadius: 16,
-                background: "#FFFBEB",
-                border: "1.5px solid #FDE68A",
-                textAlign: "left",
-                maxWidth: 680,
-                margin: "28px auto 0",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                <AlertTriangle size={20} color="#D97706" />
-                <span style={{ fontSize: 14, fontWeight: 800, color: "#92400E", textTransform: "uppercase" }}>
-                  Consumer Safety Warning
-                </span>
+            <div className="mt-8 p-5 rounded-2xl bg-amber-50 border border-amber-200 text-left max-w-xl mx-auto text-xs space-y-2">
+              <div className="flex items-center gap-1.5 font-bold text-amber-900 uppercase">
+                <AlertTriangle size={16} className="text-amber-600" />
+                <span>Patient Safety Advisory</span>
               </div>
-              <p style={{ fontSize: 13, color: "#78350F", margin: 0, lineHeight: 1.6 }}>
-                <strong>Do NOT consume, purchase, or dispense this product.</strong> This batch has failed all 6 cryptographic and pharmaceutical supply-chain verification layers. Please report this batch code to your local drug inspector or health regulatory authority immediately.
+              <p className="text-amber-800 leading-relaxed font-normal">
+                <strong>Do NOT consume, purchase, or dispense this item.</strong> This batch has failed all 6 cryptographic and supply-chain verification layers. Please report this packaging to your local health regulatory authority immediately.
               </p>
             </div>
-          </div>
+          </motion.div>
 
           {/* 6-Layer Audit Failure Checklist */}
-          <section
-            style={{
-              background: "#FFFFFF",
-              border: "1px solid #E8EAF6",
-              borderRadius: 20,
-              padding: "28px 32px",
-              marginBottom: 32,
-              boxShadow: "0 4px 20px rgba(0,0,0,0.03)",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
-              <ShieldAlert size={22} color="#DC2626" />
-              <h2 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 18, fontWeight: 800, color: "#18182E", margin: 0 }}>
+          <section className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <ShieldAlert size={20} className="text-rose-600" />
+              <h2 className="text-sm font-bold text-slate-900">
                 6-Layer Cryptographic Security Audit (Failed Checks)
               </h2>
             </div>
 
-            <div style={{ display: "grid", gap: 10 }}>
+            <div className="grid gap-2.5">
               <VerifyRow label="Layer 1: QR Cryptographic Signature" status={layers.qr} />
               <VerifyRow label="Layer 2: Pharmaceutical Database Registry" status={layers.database} />
               <VerifyRow label="Layer 3: Canonical SHA-256 Merkle Proof" status={layers.integrity} />
@@ -394,24 +291,24 @@ export default function VerifyResult() {
             </div>
 
             {/* Reasons List */}
-            <div style={{ marginTop: 24, padding: "18px 20px", borderRadius: 14, background: "#FEF2F2", border: "1px solid #FECACA" }}>
-              <div style={{ fontSize: 12, fontWeight: 800, color: "#991B1B", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
+            <div className="mt-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-xs">
+              <div className="font-extrabold text-rose-900 uppercase tracking-wider mb-2">
                 Security Violation Reasons Detected:
               </div>
               {reasons.map((r, i) => (
-                <div key={i} style={{ fontSize: 13, color: "#7F1D1D", display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 6 }}>
-                  <span style={{ color: "#DC2626" }}>✖</span> {r}
+                <div key={i} className="text-rose-800 flex items-start gap-2 mb-1.5">
+                  <span className="text-rose-600 font-bold shrink-0">✖</span>
+                  <span>{r}</span>
                 </div>
               ))}
             </div>
           </section>
 
           {/* Action Buttons */}
-          <div style={{ display: "flex", gap: 14, justifyContent: "center" }}>
+          <div className="flex justify-center">
             <button
               onClick={() => navigate("/customer")}
-              className="btn-primary"
-              style={{ padding: "12px 28px", fontSize: 14, fontWeight: 800, display: "inline-flex", alignItems: "center", gap: 8 }}
+              className="btn-primary-lg inline-flex items-center gap-2"
             >
               <ArrowLeft size={16} /> Scan / Enter Another Medicine
             </button>
@@ -422,138 +319,153 @@ export default function VerifyResult() {
   }
 
   // ── AUTHENTIC MEDICINE VIEW ──
-  const { medicine, status, confidence, authenticityScore, layers, reasons, timeline } = data;
-  const isAuthentic = status === "AUTHENTIC";
-  const isSuspicious = status === "SUSPICIOUS";
-  const fullHistory = timeline && timeline.length > 0 ? timeline : medicine.transferHistory || [];
+  const medicine = data.medicine || {};
+  const status = data.status || data.result?.status || (data.isFake ? "COUNTERFEIT" : "AUTHENTIC");
+  const confidence = data.confidence ?? data.checks?.ai?.confidence ?? (data.aiAnalysis?.confidence || 98);
+  const authenticityScore = data.authenticityScore ?? data.result?.score ?? (data.isFake ? 0 : 100);
+  const layers = data.layers || {};
+  const reasons = data.reasons || [];
+  const warnings = data.warnings || [];
+  const aiAnalysis = data.aiAnalysis || null;
+  const ocrData = aiAnalysis?.extractedData || data.checks?.ocr?.extractedData || null;
+  const comparison = aiAnalysis?.comparison || null;
+  const isAuthentic = status === "AUTHENTIC" || status === "VERIFIED_AUTHENTIC";
+  const fullHistory = (data.timeline && data.timeline.length > 0) ? data.timeline : (medicine.transferHistory || []);
 
   return (
-    <div className="page-bg" style={{ minHeight: "100vh" }}>
+    <div className="page-bg min-h-screen text-slate-900">
       <Background />
       <Header />
       <Toaster position="top-right" />
 
-      <main style={{ position: "relative", zIndex: 1, width: "100%", maxWidth: 1280, margin: "0 auto", padding: "108px 36px 80px" }}>
+      <main className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-16">
         {/* Back Button */}
         <button
           onClick={() => navigate("/customer")}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            background: "#FFFFFF",
-            border: "1px solid #E8EAF6",
-            borderRadius: 10,
-            padding: "9px 18px",
-            cursor: "pointer",
-            color: "#18182E",
-            fontSize: 13,
-            fontWeight: 700,
-            marginBottom: 32,
-            boxShadow: "0 2px 6px rgba(0,0,0,0.02)",
-          }}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:text-sky-600 mb-6 shadow-sm"
         >
-          <ArrowLeft size={16} /> Scan Another Medicine
+          <ArrowLeft size={14} /> Scan Another Medicine
         </button>
 
         {/* ── STATUS HERO ── */}
-        <div
-          style={{
-            textAlign: "center",
-            marginBottom: 32,
-            padding: "40px 28px",
-            borderRadius: 24,
-            background: "#FFFFFF",
-            border: `2px solid ${isAuthentic ? "rgba(16,185,129,0.35)" : "rgba(245,158,11,0.35)"}`,
-            boxShadow: isAuthentic ? "0 10px 40px rgba(16,185,129,0.08)" : "0 10px 40px rgba(245,158,11,0.08)",
-          }}
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`text-center bg-white rounded-3xl p-8 sm:p-10 shadow-sm mb-8 border-2 ${
+            isAuthentic ? "border-emerald-200" : "border-amber-200"
+          }`}
         >
           <StatusBadge status={status} size="large" />
 
-          <h1
-            style={{
-              fontFamily: "'Plus Jakarta Sans', sans-serif",
-              fontSize: "2.3rem",
-              fontWeight: 800,
-              color: "#18182E",
-              marginTop: 20,
-              marginBottom: 4,
-            }}
-          >
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 mt-4 mb-1 tracking-tight">
             {medicine.name}
           </h1>
-          <p style={{ fontSize: 15, color: "#5F607A" }}>
-            {medicine.company || medicine.manufacturer} · Batch {medicine.batchId}
+          <p className="text-sm font-medium text-slate-500">
+            {medicine.company || medicine.manufacturer} · Batch #{medicine.batchId}
           </p>
 
-          <div style={{ display: "flex", justifyContent: "center", gap: 32, marginTop: 18, flexWrap: "wrap" }}>
-            <div style={{ fontSize: 14, color: "#5F607A" }}>
-              Authenticity Score: <strong style={{ color: isAuthentic ? "#059669" : "#D97706", fontSize: 16 }}>{authenticityScore}%</strong>
+          <div className="flex flex-wrap justify-center gap-6 sm:gap-10 mt-6 pt-6 border-t border-slate-100 text-xs">
+            <div>
+              <p className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Authenticity Score</p>
+              <p className="text-lg font-extrabold text-emerald-600 mt-0.5">{authenticityScore}/100</p>
             </div>
-            <div style={{ fontSize: 14, color: "#5F607A" }}>
-              AI/Audit Confidence: <strong style={{ color: "#18182E", fontSize: 16 }}>{confidence}%</strong>
+            <div>
+              <p className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Verification Confidence</p>
+              <p className="text-lg font-extrabold text-slate-900 mt-0.5">{confidence}%</p>
             </div>
-            <div style={{ fontSize: 14, color: "#5F607A" }}>
-              Verification Count: <strong style={{ color: "#5855F3", fontSize: 16 }}>{medicine.verificationCount || 1}</strong>
+            <div>
+              <p className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Tampering Risk</p>
+              <p className="text-lg font-extrabold text-emerald-600 mt-0.5">
+                {aiAnalysis?.tamperingAnalysis?.riskLevel || "LOW"}
+              </p>
+            </div>
+            <div>
+              <p className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Verified Scans</p>
+              <p className="text-lg font-extrabold text-sky-600 mt-0.5">{medicine.verificationCount || 1}</p>
             </div>
           </div>
 
-          {/* Verification reasons */}
-          {reasons && reasons.length > 0 && (
-            <div
-              style={{
-                marginTop: 24,
-                padding: "18px 22px",
-                borderRadius: 16,
-                background: isAuthentic ? "#F0FDF4" : "#FEF3C7",
-                border: `1px solid ${isAuthentic ? "rgba(16,185,129,0.3)" : "rgba(245,158,11,0.3)"}`,
-                textAlign: "left",
-                display: "inline-block",
-                maxWidth: 680,
-                width: "100%",
-              }}
-            >
-              <div
-                style={{
-                  fontFamily: "'Plus Jakarta Sans', sans-serif",
-                  fontWeight: 800,
-                  fontSize: 12,
-                  color: isAuthentic ? "#166534" : "#92400E",
-                  marginBottom: 10,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                }}
-              >
-                {isAuthentic ? "✓ Cryptographic Evidence Verified:" : "⚠ Supply-Chain Anomaly Flags:"}
+          {/* Warnings Section */}
+          {warnings && warnings.length > 0 && (
+            <div className="mt-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-left max-w-xl mx-auto text-xs">
+              <div className="flex items-center gap-1.5 font-bold text-rose-800 uppercase mb-1">
+                <AlertTriangle size={15} className="text-rose-600" />
+                <span>Verification Warnings:</span>
               </div>
-              {reasons.map((r, i) => (
-                <div key={i} style={{ fontSize: 13.5, color: isAuthentic ? "#14532D" : "#78350F", display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 6 }}>
-                  <span style={{ color: isAuthentic ? "#16A34A" : "#D97706", marginTop: 1 }}>▸</span> {r}
+              {warnings.map((w, idx) => (
+                <div key={idx} className="text-rose-700 mt-0.5">
+                  ⚠ {w}
                 </div>
               ))}
             </div>
           )}
-        </div>
+
+          {/* Evidence Explanation */}
+          {reasons && reasons.length > 0 && (
+            <div className={`mt-6 p-4 rounded-2xl text-left max-w-xl mx-auto text-xs border ${
+              isAuthentic ? "bg-emerald-50/70 border-emerald-200" : "bg-amber-50/70 border-amber-200"
+            }`}>
+              <div className="font-extrabold uppercase tracking-wider mb-2 text-slate-800">
+                {isAuthentic ? "✓ Cryptographic Evidence Verified:" : "⚠ Supply-Chain Findings:"}
+              </div>
+              {reasons.map((r, i) => (
+                <div key={i} className="text-slate-700 flex items-start gap-1.5 mb-1">
+                  <span className={isAuthentic ? "text-emerald-600" : "text-amber-600"}>▸</span>
+                  <span>{r}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </motion.div>
+
+        {/* ── MANUFACTURER MEDICINE IMAGE ── */}
+        <section className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm mb-6">
+          <h2 className="text-sm font-bold text-slate-900 mb-4 uppercase tracking-wider">
+            📸 Original Manufacturer Reference Image
+          </h2>
+          <div style={{ borderRadius: 14, overflow: "hidden", maxHeight: 300, border: "1px solid #E2E8F0" }}>
+            <MedicineImage
+              src={medicine.medicineImage}
+              alt={`${medicine.name} — original manufacturer packaging`}
+              style={{ height: 300 }}
+              placeholderSize={140}
+            />
+          </div>
+          {medicine.medicineImage && (
+            <p className="text-xs text-slate-400 mt-2 text-center">
+              Click image to enlarge · Original photo uploaded by manufacturer at registration
+            </p>
+          )}
+        </section>
+
+        {/* ── PRODUCT SPECIFICATIONS ── */}
+        <section className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm mb-6">
+          <h2 className="text-sm font-bold text-slate-900 mb-4 uppercase tracking-wider">
+            Verified Packaging Specifications
+          </h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5">
+            <InfoCell label="Medicine Name" value={medicine.name} icon={Package} color="#0284C7" />
+            <InfoCell label="Batch Number" value={medicine.batchId} icon={QrCode} color="#0D9488" />
+            <InfoCell label="Manufacturer" value={medicine.company || medicine.manufacturer} icon={Building2} color="#0369A1" />
+            <InfoCell label="Manufacturer Code" value={medicine.manufacturerCode} icon={FileText} color="#0F766E" />
+            <InfoCell label="Manufacturing Date" value={medicine.manufacturingDate} icon={Calendar} color="#059669" />
+            <InfoCell label="Expiry Date" value={medicine.expiryDate} icon={Clock} color="#D97706" />
+            <InfoCell label="MRP Price" value={medicine.price ? `₹${medicine.price}` : "—"} icon={DollarSign} color="#10B981" />
+            <InfoCell label="Batch Size" value={medicine.quantity ? `${medicine.quantity} units` : "—"} icon={Package} color="#0284C7" />
+          </div>
+        </section>
 
         {/* ── 6-LAYER VERIFICATION CHECKLIST ── */}
-        <section
-          style={{
-            background: "#FFFFFF",
-            border: "1px solid #E8EAF6",
-            borderRadius: 20,
-            padding: "28px 32px",
-            marginBottom: 32,
-            boxShadow: "0 4px 20px rgba(0,0,0,0.03)",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
-            <ShieldCheck size={22} color="#059669" />
-            <h2 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 18, fontWeight: 800, color: "#18182E", margin: 0 }}>
+        <section className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <ShieldCheck size={20} className="text-emerald-600" />
+            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
               6-Layer Cryptographic Security Audit
             </h2>
           </div>
 
-          <div style={{ display: "grid", gap: 10 }}>
+          <div className="grid gap-2.5">
             <VerifyRow label="Layer 1: QR Cryptographic Signature" status={layers.qr} />
             <VerifyRow label="Layer 2: Pharmaceutical Database Registry" status={layers.database} />
             <VerifyRow label="Layer 3: Canonical SHA-256 Merkle Proof" status={layers.integrity} />
@@ -563,92 +475,34 @@ export default function VerifyResult() {
           </div>
         </section>
 
-        {/* ── PRODUCT SPECIFICATIONS ── */}
-        <section
-          style={{
-            background: "#FFFFFF",
-            border: "1px solid #E8EAF6",
-            borderRadius: 20,
-            padding: "28px 32px",
-            marginBottom: 32,
-            boxShadow: "0 4px 20px rgba(0,0,0,0.03)",
-          }}
-        >
-          <h2 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 18, fontWeight: 800, color: "#18182E", marginBottom: 20 }}>
-            Product Specifications
-          </h2>
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
-            <InfoCell label="Medicine Name" value={medicine.name} icon={Package} color="#5855F3" />
-            <InfoCell label="Batch Number" value={medicine.batchId} icon={QrCode} color="#7C3AED" />
-            <InfoCell label="Manufacturer" value={medicine.company || medicine.manufacturer} icon={Building2} color="#2563EB" />
-            <InfoCell label="Manufacturer Code" value={medicine.manufacturerCode} icon={FileText} color="#0891B2" />
-            <InfoCell label="Manufacturing Date" value={medicine.manufacturingDate} icon={Calendar} color="#059669" />
-            <InfoCell label="Expiry Date" value={medicine.expiryDate} icon={Clock} color="#D97706" />
-            <InfoCell label="MRP / Price" value={medicine.price ? `₹${medicine.price}` : "—"} icon={DollarSign} color="#10B981" />
-            <InfoCell label="Batch Quantity" value={medicine.quantity ? `${medicine.quantity} units` : "—"} icon={Package} color="#6366F1" />
-          </div>
-        </section>
-
         {/* ── SUPPLY-CHAIN TIMELINE ── */}
         {fullHistory.length > 0 && (
-          <section
-            style={{
-              background: "#FFFFFF",
-              border: "1px solid #E8EAF6",
-              borderRadius: 20,
-              padding: "28px 32px",
-              marginBottom: 32,
-              boxShadow: "0 4px 20px rgba(0,0,0,0.03)",
-            }}
-          >
-            <h2 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 18, fontWeight: 800, color: "#18182E", marginBottom: 20 }}>
-              Immutable Supply-Chain Custody History
+          <section className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm mb-6">
+            <h2 className="text-sm font-bold text-slate-900 mb-4 uppercase tracking-wider">
+              Immutable Supply-Chain Custody Trail
             </h2>
 
-            <div style={{ display: "grid", gap: 16 }}>
+            <div className="space-y-3">
               {fullHistory.map((h, i) => (
                 <div
                   key={i}
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: 14,
-                    padding: "16px 20px",
-                    borderRadius: 14,
-                    background: "#F8F9FD",
-                    border: "1px solid #E8EAF6",
-                  }}
+                  className="flex items-start gap-3.5 p-4 rounded-2xl bg-slate-50 border border-slate-200/80"
                 >
-                  <div
-                    style={{
-                      width: 38,
-                      height: 38,
-                      borderRadius: 10,
-                      background: "#5855F3",
-                      color: "white",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontWeight: 800,
-                      fontSize: 14,
-                      flexShrink: 0,
-                    }}
-                  >
+                  <div className="w-8 h-8 rounded-lg bg-sky-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
                     #{i + 1}
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                      <span style={{ fontSize: 15, fontWeight: 800, color: "#18182E" }}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                      <p className="text-xs font-bold text-slate-900 truncate">
                         {h.role || "Supply Chain Node"} — {h.handler || h.to || h.from || "Authorized Partner"}
-                      </span>
-                      <span style={{ fontSize: 12, color: "#8E8FA8" }}>
-                        {h.timestamp ? new Date(h.timestamp).toLocaleString("en-IN") : "Recorded on Blockchain"}
+                      </p>
+                      <span className="text-[11px] text-slate-400 shrink-0">
+                        {h.timestamp ? new Date(h.timestamp).toLocaleString("en-IN") : "Recorded"}
                       </span>
                     </div>
-                    <div style={{ fontSize: 13, color: "#5F607A" }}>
+                    <p className="text-xs text-slate-500 font-normal">
                       {h.notes || h.action || "Cryptographically signed and confirmed on DrugChain ledger"}
-                    </div>
+                    </p>
                   </div>
                 </div>
               ))}
@@ -658,41 +512,23 @@ export default function VerifyResult() {
 
         {/* ── ON-CHAIN MERKLE PROOF ── */}
         {medicine.blockchainTxHash && (
-          <section
-            style={{
-              background: "#18182E",
-              color: "white",
-              borderRadius: 20,
-              padding: "24px 28px",
-              boxShadow: "0 8px 30px rgba(24,24,46,0.15)",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <ShieldCheck size={20} color="#10B981" />
-                <span style={{ fontSize: 14, fontWeight: 800, color: "white" }}>DrugChain Transaction Hash</span>
+          <section className="bg-slate-900 text-white rounded-3xl p-6 sm:p-7 shadow-lg">
+            <div className="flex items-center justify-between gap-4 mb-2">
+              <div className="flex items-center gap-2">
+                <ShieldCheck size={18} className="text-emerald-400" />
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                  DrugChain Transaction Hash
+                </span>
               </div>
               <button
                 onClick={() => copyHash(medicine.blockchainTxHash)}
-                style={{
-                  background: "rgba(255,255,255,0.1)",
-                  border: "none",
-                  color: "white",
-                  padding: "6px 14px",
-                  borderRadius: 8,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-bold text-white transition-colors"
               >
-                {copied ? <Check size={14} color="#10B981" /> : <Copy size={14} />}
-                {copied ? "Copied!" : "Copy Hash"}
+                {copied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                <span>{copied ? "Copied" : "Copy Hash"}</span>
               </button>
             </div>
-            <div style={{ fontFamily: "monospace", fontSize: 12, color: "#94A3B8", wordBreak: "break-all" }}>
+            <div className="font-mono text-xs text-slate-400 break-all select-all">
               {medicine.blockchainTxHash}
             </div>
           </section>

@@ -17,7 +17,7 @@ export default function ProtectedRoute({ allowedRoles, children }) {
           background: "#F8F9FE",
         }}
       >
-        <Loader2 size={36} color="#5855F3" style={{ animation: "spin 1s linear infinite" }} />
+        <Loader2 size={36} color="#0284C7" style={{ animation: "spin 1s linear infinite" }} />
       </div>
     );
   }

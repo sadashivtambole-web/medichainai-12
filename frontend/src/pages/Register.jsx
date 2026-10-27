@@ -1,11 +1,12 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
+  Shield,
   Building2,
   Server,
   Store,
   User,
-  Shield,
   ArrowRight,
   ArrowLeft,
   CheckCircle2,
@@ -19,58 +20,21 @@ import {
   Upload,
   RefreshCw,
   FileText,
-  Eye,
-  X,
-  AlertTriangle,
+  AlertCircle,
   Loader2,
-  FileCheck,
+  Check,
+  Sparkles,
+  Info,
 } from "lucide-react";
-import Background from "../components/layout/Background";
+import AuthBackground from "../components/auth/AuthBackground";
+import AuthHeader from "../components/auth/AuthHeader";
+import RoleSelector, { AUTH_ROLES } from "../components/auth/RoleSelector";
+import FormInput from "../components/auth/FormInput";
+import FileUploadCard from "../components/auth/FileUploadCard";
+import CameraCaptureModal from "../components/auth/CameraCaptureModal";
+import OtpInput from "../components/auth/OtpInput";
 import { authService } from "../services/authService";
 import toast, { Toaster } from "react-hot-toast";
-
-const ROLES = [
-  {
-    id: "Manufacturer",
-    title: "Manufacturer",
-    description: "Drug origin, batch registration & digital certificate stamping",
-    icon: Building2,
-    color: "#5855F3",
-    bg: "#EEF0FD",
-    codeLabel: "Manufacturer Code / License",
-    codePlaceholder: "e.g. MFR-SUN-772",
-  },
-  {
-    id: "Distributor",
-    title: "Distributor",
-    description: "Transit custody confirmation & intermediate distribution trace",
-    icon: Server,
-    color: "#7C3AED",
-    bg: "#F5F3FF",
-    codeLabel: "Distributor License / Logistics Code",
-    codePlaceholder: "e.g. DST-MH-102",
-  },
-  {
-    id: "Pharmacy",
-    title: "Pharmacy",
-    description: "Dispensing receipt, shelf inventory & public POS verification",
-    icon: Store,
-    color: "#059669",
-    bg: "#ECFDF5",
-    codeLabel: "Pharmacy License / Store Code",
-    codePlaceholder: "e.g. PH-APL-404",
-  },
-  {
-    id: "Customer",
-    title: "Customer / Public",
-    description: "Public zero-trust QR scanning & immutable medicine verification",
-    icon: User,
-    color: "#D97706",
-    bg: "#FFFBEB",
-    codeLabel: "",
-    codePlaceholder: "",
-  },
-];
 
 export default function Register() {
   const navigate = useNavigate();
@@ -94,105 +58,118 @@ export default function Register() {
 
   // Government ID States
   const [governmentIdFile, setGovernmentIdFile] = useState(null);
-  const [governmentIdPreview, setGovernmentIdPreview] = useState(null);
 
   // Camera Modal States
   const [isCameraOpen, setIsCameraOpen] = useState(false);
-  const [cameraStream, setCameraStream] = useState(null);
-  const [capturedPhoto, setCapturedPhoto] = useState(null);
-  const [cameraError, setCameraError] = useState("");
 
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const fileInputPhotoRef = useRef(null);
-  const fileInputGovIdRef = useRef(null);
+  // OTP Email Verification States with Session Persistence across refreshes
+  const [pendingRegId, setPendingRegId] = useState(() => sessionStorage.getItem("pending_reg_id") || "");
+  const [pendingEmail, setPendingEmail] = useState(() => sessionStorage.getItem("pending_reg_email") || "");
+  const [otpStep, setOtpStep] = useState(() => !!sessionStorage.getItem("pending_reg_id"));
+  const [otpCode, setOtpCode] = useState("");
+  const [isOtpSending, setIsOtpSending] = useState(false);
+  const [isOtpVerifying, setIsOtpVerifying] = useState(false);
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
 
   const isProfessional = selectedRole !== "Customer";
+  const selectedRoleConfig =
+    AUTH_ROLES.find((r) => r.id === selectedRole) || AUTH_ROLES[0];
 
   const setField = (key) => (e) => {
     setFormData((prev) => ({ ...prev, [key]: e.target.value }));
   };
 
-  // Start Camera Stream
-  const openCamera = async () => {
-    setCameraError("");
-    setCapturedPhoto(null);
-    setIsCameraOpen(true);
+  // Trigger Send OTP
+  const handleSendOtp = async () => {
+    const cleanEmail = formData.email.trim();
+    if (!cleanEmail) {
+      toast.error("Please enter your email address first.");
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      toast.error("Please enter a valid email address.");
+      return;
+    }
+
+    setIsOtpSending(true);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
-        audio: false,
-      });
-      setCameraStream(stream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
+      const res = await authService.sendOtp(cleanEmail, formData.fullName.trim());
+      if (res.success) {
+        toast.success(`6-digit code sent to ${cleanEmail}`);
+        setOtpStep(true);
+      } else {
+        toast.error(res.message || "Failed to dispatch verification code.");
       }
     } catch (err) {
-      console.error("Camera access error:", err);
-      setCameraError("Camera permission denied or camera not available. You can use the 'Upload Photo' option instead.");
+      toast.error(err.message || "Could not send OTP code.");
+    } finally {
+      setIsOtpSending(false);
     }
   };
 
-  // Stop Camera Stream
-  const closeCamera = () => {
-    if (cameraStream) {
-      cameraStream.getTracks().forEach((track) => track.stop());
-      setCameraStream(null);
+  // Verify Registration OTP & Finalize Account Creation
+  const handleVerifyOtp = async () => {
+    if (otpCode.length < 6) {
+      toast.error("Please enter the complete 6-digit verification code.");
+      return;
     }
-    setIsCameraOpen(false);
-    setCapturedPhoto(null);
-  };
 
-  useEffect(() => {
-    if (isCameraOpen && cameraStream && videoRef.current) {
-      videoRef.current.srcObject = cameraStream;
-    }
-    return () => {
-      if (cameraStream) {
-        cameraStream.getTracks().forEach((track) => track.stop());
+    const activeEmail = (formData.email || pendingEmail || sessionStorage.getItem("pending_reg_email") || "").trim();
+    const activeRegId = pendingRegId || sessionStorage.getItem("pending_reg_id") || "";
+
+    setIsOtpVerifying(true);
+    try {
+      const res = await authService.verifyRegistrationOtp(activeEmail, otpCode, activeRegId);
+      if (res.success) {
+        sessionStorage.removeItem("pending_reg_id");
+        sessionStorage.removeItem("pending_reg_email");
+        toast.success("Email verified and application submitted for Creator review!");
+        setIsEmailVerified(true);
+        setOtpStep(false);
+        setSubmittedSuccess(true);
+      } else {
+        toast.error(res.message || "Invalid or expired OTP code.");
       }
-    };
-  }, [isCameraOpen, cameraStream]);
-
-  // Capture Snapshot from Camera
-  const captureSnapshot = () => {
-    if (!videoRef.current || !canvasRef.current) return;
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
-    setCapturedPhoto(dataUrl);
+    } catch (err) {
+      toast.error(err.message || "OTP verification failed.");
+    } finally {
+      setIsOtpVerifying(false);
+    }
   };
 
-  const useThisCapturedPhoto = () => {
-    if (capturedPhoto) {
-      setIdentityPhotoBase64(capturedPhoto);
-      setIdentityPhotoPreview(capturedPhoto);
-      setIdentityPhotoFile(null);
-      toast.success("Live identity photo captured!");
-      closeCamera();
+  // Resend Registration OTP
+  const handleResendRegistrationOtp = async () => {
+    const activeEmail = (formData.email || pendingEmail || sessionStorage.getItem("pending_reg_email") || "").trim();
+    const activeRegId = pendingRegId || sessionStorage.getItem("pending_reg_id") || "";
+
+    setIsOtpSending(true);
+    try {
+      const res = await authService.resendOtp(activeEmail, "REGISTRATION", "", activeRegId);
+      if (res.success) {
+        if (res.data?.registrationId) {
+          setPendingRegId(res.data.registrationId);
+          sessionStorage.setItem("pending_reg_id", res.data.registrationId);
+        }
+        toast.success(`A fresh 6-digit code has been dispatched to ${activeEmail}`);
+      } else {
+        toast.error(res.message || "Could not resend OTP code.");
+      }
+    } catch (err) {
+      toast.error(err.message || "Failed to resend code.");
+    } finally {
+      setIsOtpSending(false);
     }
   };
 
   // Handle Photo File Upload
-  const handlePhotoFileUpload = (e) => {
-    const file = e.target.files?.[0];
+  const handlePhotoFileUpload = (file) => {
     if (!file) return;
-
     if (file.size > 10 * 1024 * 1024) {
       toast.error("Photo must be less than 10MB");
-      return;
-    }
-
-    const validTypes = ["image/jpeg", "image/png", "image/webp"];
-    if (!validTypes.includes(file.type)) {
-      toast.error("Please upload a JPG, PNG, or WEBP image.");
       return;
     }
 
@@ -205,27 +182,14 @@ export default function Register() {
   };
 
   // Handle Government ID Upload
-  const handleGovernmentIdUpload = (e) => {
-    const file = e.target.files?.[0];
+  const handleGovernmentIdUpload = (file) => {
     if (!file) return;
-
     if (file.size > 10 * 1024 * 1024) {
       toast.error("Document must be less than 10MB");
       return;
     }
 
-    const validTypes = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
-    if (!validTypes.includes(file.type)) {
-      toast.error("Please upload a PDF document or JPG/PNG image.");
-      return;
-    }
-
     setGovernmentIdFile(file);
-    setGovernmentIdPreview({
-      name: file.name,
-      size: (file.size / (1024 * 1024)).toFixed(2) + " MB",
-      type: file.type,
-    });
     toast.success("Government ID proof attached.");
   };
 
@@ -248,7 +212,7 @@ export default function Register() {
       return;
     }
     if (formData.password.length < 6) {
-      toast.error("Password must be at least 6 characters");
+      toast.error("Password must be at least 6 characters long");
       return;
     }
     if (formData.password !== formData.confirmPassword) {
@@ -309,8 +273,18 @@ export default function Register() {
 
       if (res.success) {
         if (selectedRole === "Customer") {
-          toast.success("Registration complete! Redirecting...");
+          toast.success("Account created successfully! Redirecting...");
           setTimeout(() => navigate("/customer"), 800);
+        } else if (res.data?.requiresOtp || res.requiresOtp) {
+          const regId = res.data?.registrationId || "";
+          const cleanEmail = formData.email.trim().toLowerCase();
+          setPendingRegId(regId);
+          setPendingEmail(cleanEmail);
+          if (regId) sessionStorage.setItem("pending_reg_id", regId);
+          sessionStorage.setItem("pending_reg_email", cleanEmail);
+          setOtpCode("");
+          setOtpStep(true);
+          toast.success(`Verification code dispatched to ${res.data?.maskedEmail || cleanEmail}`);
         } else {
           setSubmittedSuccess(true);
           toast.success("Application submitted for Creator review!");
@@ -325,883 +299,468 @@ export default function Register() {
     }
   };
 
-  const selectedRoleConfig = ROLES.find((r) => r.id === selectedRole) || ROLES[0];
-
   return (
-    <div className="page-bg" style={{ minHeight: "100vh", position: "relative" }}>
-      <Background />
+    <div className="relative min-h-screen flex flex-col justify-between py-6 sm:py-10 px-4 sm:px-6 lg:px-8 text-slate-900 select-none">
+      <AuthBackground />
       <Toaster position="top-right" />
 
-      {/* ── Top Header Navigation ── */}
-      <header
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 50,
-          background: "rgba(255, 255, 255, 0.92)",
-          backdropFilter: "blur(12px)",
-          borderBottom: "1px solid #E8EAF6",
-          padding: "14px 32px",
-        }}
-      >
-        <div
-          style={{
-            width: "100%",
-            maxWidth: 1400,
-            margin: "0 auto",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
+      {/* ── Brand Header ── */}
+      <AuthHeader currentAction="register" />
+
+      {/* ── Main Container ── */}
+      <main className="relative z-10 w-full max-w-4xl mx-auto my-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          className="bg-white/95 backdrop-blur-2xl border border-white/80 rounded-3xl p-6 sm:p-10 shadow-2xl shadow-sky-950/10"
         >
-          <div
-            onClick={() => navigate("/login")}
-            style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}
-          >
-            <div
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 12,
-                background: "linear-gradient(135deg, #4F46E5, #6366F1)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                boxShadow: "0 4px 14px rgba(99, 102, 241, 0.35)",
-              }}
-            >
-              <Shield size={22} color="white" />
+          {/* Form Header */}
+          <div className="mb-8">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+              <span className="text-xs font-bold text-sky-700 bg-sky-50 px-3 py-1 rounded-full border border-sky-200 uppercase tracking-wider">
+                Platform Onboarding
+              </span>
+              <span className="text-xs text-slate-500 font-medium">
+                Already registered?{" "}
+                <Link
+                  to="/login"
+                  className="font-bold text-sky-600 hover:text-sky-800 underline underline-offset-2"
+                >
+                  Sign In Here
+                </Link>
+              </span>
             </div>
-            <div>
-              <div
-                style={{
-                  fontFamily: "'Plus Jakarta Sans', sans-serif",
-                  fontSize: 17,
-                  fontWeight: 800,
-                  color: "#0F172A",
-                }}
-              >
-                Fake Drug Detection
-              </div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#4F46E5" }}>
-                Cryptographic Supply Chain Platform
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span style={{ fontSize: 13, color: "#64748B" }}>Already have an account?</span>
-            <Link
-              to="/login"
-              style={{
-                color: "#4F46E5",
-                fontSize: 13,
-                fontWeight: 700,
-                textDecoration: "none",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 4,
-              }}
-            >
-              Sign In <ArrowRight size={14} />
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      {/* ── Main Content Container ── */}
-      <main
-        style={{
-          position: "relative",
-          zIndex: 1,
-          width: "100%",
-          maxWidth: 1120,
-          margin: "0 auto",
-          padding: "100px 36px 80px",
-        }}
-      >
-        {/* Success Confirmation Card */}
-        {submittedSuccess ? (
-          <div
-            style={{
-              background: "#FFFFFF",
-              border: "1px solid #E8EAF6",
-              borderRadius: 24,
-              padding: "48px 36px",
-              textAlign: "center",
-              boxShadow: "0 10px 40px rgba(0,0,0,0.04)",
-            }}
-          >
-            <div
-              style={{
-                width: 72,
-                height: 72,
-                borderRadius: "50%",
-                background: "#ECFDF5",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                margin: "0 auto 20px",
-                color: "#10B981",
-              }}
-            >
-              <CheckCircle2 size={40} />
-            </div>
-
-            <h1
-              style={{
-                fontFamily: "'Plus Jakarta Sans', sans-serif",
-                fontSize: "1.75rem",
-                fontWeight: 800,
-                color: "#18182E",
-                marginBottom: 12,
-              }}
-            >
-              Application Submitted Successfully!
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              Register Organization Account
             </h1>
-
-            <p style={{ fontSize: 14, color: "#5F607A", maxWidth: 540, margin: "0 auto 24px", lineHeight: 1.6 }}>
-              Thank you, <strong>{formData.fullName}</strong>. Your <strong>{selectedRole}</strong> application for{" "}
-              <strong>{formData.companyName}</strong> has been submitted for Creator identity verification.
+            <p className="text-xs sm:text-sm text-slate-500 mt-1">
+              Select your ecosystem role and submit your identity credentials for immutable verification.
             </p>
-
-            <div
-              style={{
-                background: "#F8F9FE",
-                border: "1px solid #E8EAF6",
-                borderRadius: 16,
-                padding: "20px 24px",
-                textAlign: "left",
-                maxWidth: 480,
-                margin: "0 auto 32px",
-              }}
-            >
-              <div style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", color: "#8E8FA8", marginBottom: 12 }}>
-                Application Summary
-              </div>
-              <div style={{ display: "grid", gap: 8, fontSize: 13, color: "#18182E" }}>
-                <div><strong>Registered Email:</strong> {formData.email}</div>
-                <div><strong>Role:</strong> {selectedRole}</div>
-                <div><strong>Company:</strong> {formData.companyName}</div>
-                <div><strong>Status:</strong> <span style={{ color: "#D97706", fontWeight: 700 }}>PENDING CREATOR APPROVAL</span></div>
-              </div>
-            </div>
-
-            <div
-              style={{
-                background: "#ECFDF5",
-                border: "1px solid #A7F3D0",
-                borderRadius: 12,
-                padding: "14px 20px",
-                maxWidth: 480,
-                margin: "0 auto 28px",
-                fontSize: 13,
-                color: "#065F46",
-                lineHeight: 1.5,
-              }}
-            >
-              <strong>Sign In Notice:</strong> Once approved by the Creator, you will log in using your <strong>registered email</strong> and the <strong>password you just created</strong>.
-            </div>
-
-            <button
-              onClick={() => navigate("/login")}
-              className="btn-primary"
-              style={{ padding: "12px 32px", fontSize: 14, fontWeight: 800, display: "inline-flex", alignItems: "center", gap: 8 }}
-            >
-              Back to Login <ArrowRight size={16} />
-            </button>
           </div>
-        ) : (
-          <div
-            style={{
-              background: "#FFFFFF",
-              border: "1px solid #E8EAF6",
-              borderRadius: 24,
-              boxShadow: "0 10px 40px rgba(0,0,0,0.04)",
-              overflow: "hidden",
-            }}
-          >
-            {/* Header Banner */}
-            <div
-              style={{
-                padding: "32px 36px 24px",
-                borderBottom: "1px solid #F1F3FC",
-              }}
-            >
-              <h1
-                style={{
-                  fontFamily: "'Plus Jakarta Sans', sans-serif",
-                  fontSize: "1.65rem",
-                  fontWeight: 800,
-                  color: "#18182E",
-                  marginBottom: 6,
-                }}
-              >
-                Create Your Account
-              </h1>
-              <p style={{ fontSize: 13, color: "#5F607A", margin: 0 }}>
-                Register on DrugChain to participate in secure pharmaceutical supply-chain traceability
-              </p>
-            </div>
 
-            <div style={{ padding: "28px 36px 36px" }}>
-              {/* ── 1. Select Role ── */}
-              <div style={{ marginBottom: 28 }}>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: 11,
-                    fontWeight: 800,
-                    letterSpacing: "0.08em",
-                    textTransform: "uppercase",
-                    color: "#5F607A",
-                    marginBottom: 10,
-                  }}
-                >
-                  Select Your Role
-                </label>
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-                    gap: 10,
-                  }}
-                >
-                  {ROLES.map((role) => {
-                    const Icon = role.icon;
-                    const isSelected = selectedRole === role.id;
-                    return (
-                      <button
-                        key={role.id}
-                        type="button"
-                        onClick={() => setSelectedRole(role.id)}
-                        style={{
-                          background: isSelected ? role.bg : "#F8F9FE",
-                          border: `1.5px solid ${isSelected ? role.color : "#E8EAF6"}`,
-                          borderRadius: 14,
-                          padding: "12px 10px",
-                          cursor: "pointer",
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          gap: 6,
-                          transition: "all 0.2s ease",
-                          textAlign: "center",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: 34,
-                            height: 34,
-                            borderRadius: 10,
-                            background: isSelected ? role.color : "#FFFFFF",
-                            border: `1px solid ${isSelected ? role.color : "#E8EAF6"}`,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                        >
-                          <Icon size={16} color={isSelected ? "white" : "#5F607A"} />
-                        </div>
-                        <span
-                          style={{
-                            fontFamily: "'Plus Jakarta Sans', sans-serif",
-                            fontSize: 12,
-                            fontWeight: 800,
-                            color: isSelected ? role.color : "#18182E",
-                          }}
-                        >
-                          {role.title}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+          {/* ══ STEP 1: INTERACTIVE ROLE SELECTOR ══ */}
+          <div className="mb-8">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-5 h-5 rounded-full bg-sky-600 text-white flex items-center justify-center font-bold text-[10px]">
+                1
               </div>
-
-              <form onSubmit={handleSubmit}>
-                <div style={{ display: "grid", gap: 20 }}>
-                  {/* ── Section 1: Personal & Account Credentials ── */}
-                  <div style={{ borderBottom: "1px solid #F1F3FC", paddingBottom: 20 }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: "#18182E", marginBottom: 14 }}>
-                      1. Account & Personal Details
-                    </div>
-
-                    <div style={{ display: "grid", gap: 14 }}>
-                      <div>
-                        <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#18182E", marginBottom: 6 }}>
-                          Full Name *
-                        </label>
-                        <div style={{ position: "relative" }}>
-                          <UserCheck size={16} color="#8E8FA8" style={{ position: "absolute", left: 14, top: 14 }} />
-                          <input
-                            type="text"
-                            required
-                            value={formData.fullName}
-                            onChange={setField("fullName")}
-                            placeholder="e.g. Dr. Ganesh Tambole"
-                            style={{
-                              width: "100%",
-                              padding: "11px 14px 11px 42px",
-                              borderRadius: 10,
-                              border: "1px solid #E8EAF6",
-                              fontSize: 14,
-                              color: "#18182E",
-                              outline: "none",
-                              boxSizing: "border-box",
-                            }}
-                          />
-                        </div>
-                      </div>
-
-                      <div style={{ display: "grid", gridTemplateColumns: isProfessional ? "1fr 1fr" : "1fr", gap: 12 }}>
-                        <div>
-                          <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#18182E", marginBottom: 6 }}>
-                            Email Address *
-                          </label>
-                          <div style={{ position: "relative" }}>
-                            <Mail size={16} color="#8E8FA8" style={{ position: "absolute", left: 14, top: 14 }} />
-                            <input
-                              type="email"
-                              required
-                              value={formData.email}
-                              onChange={setField("email")}
-                              placeholder="e.g. ganesh@sunpharma.com"
-                              style={{
-                                width: "100%",
-                                padding: "11px 14px 11px 42px",
-                                borderRadius: 10,
-                                border: "1px solid #E8EAF6",
-                                fontSize: 14,
-                                color: "#18182E",
-                                outline: "none",
-                                boxSizing: "border-box",
-                              }}
-                            />
-                          </div>
-                        </div>
-
-                        {isProfessional && (
-                          <div>
-                            <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#18182E", marginBottom: 6 }}>
-                              Phone Number *
-                            </label>
-                            <div style={{ position: "relative" }}>
-                              <Phone size={16} color="#8E8FA8" style={{ position: "absolute", left: 14, top: 14 }} />
-                              <input
-                                type="tel"
-                                required
-                                value={formData.phone}
-                                onChange={setField("phone")}
-                                placeholder="+91 98220 12345"
-                                style={{
-                                  width: "100%",
-                                  padding: "11px 14px 11px 42px",
-                                  borderRadius: 10,
-                                  border: "1px solid #E8EAF6",
-                                  fontSize: 14,
-                                  color: "#18182E",
-                                  outline: "none",
-                                  boxSizing: "border-box",
-                                }}
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                        <div>
-                          <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#18182E", marginBottom: 6 }}>
-                            Password *
-                          </label>
-                          <div style={{ position: "relative" }}>
-                            <Lock size={16} color="#8E8FA8" style={{ position: "absolute", left: 14, top: 14 }} />
-                            <input
-                              type="password"
-                              required
-                              value={formData.password}
-                              onChange={setField("password")}
-                              placeholder="Minimum 6 characters"
-                              style={{
-                                width: "100%",
-                                padding: "11px 14px 11px 42px",
-                                borderRadius: 10,
-                                border: "1px solid #E8EAF6",
-                                fontSize: 14,
-                                color: "#18182E",
-                                outline: "none",
-                                boxSizing: "border-box",
-                              }}
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#18182E", marginBottom: 6 }}>
-                            Confirm Password *
-                          </label>
-                          <div style={{ position: "relative" }}>
-                            <Lock size={16} color="#8E8FA8" style={{ position: "absolute", left: 14, top: 14 }} />
-                            <input
-                              type="password"
-                              required
-                              value={formData.confirmPassword}
-                              onChange={setField("confirmPassword")}
-                              placeholder="Re-enter password"
-                              style={{
-                                width: "100%",
-                                padding: "11px 14px 11px 42px",
-                                borderRadius: 10,
-                                border: "1px solid #E8EAF6",
-                                fontSize: 14,
-                                color: "#18182E",
-                                outline: "none",
-                                boxSizing: "border-box",
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* ── Section 2: Organization Information (Professional Roles Only) ── */}
-                  {isProfessional && (
-                    <div style={{ borderBottom: "1px solid #F1F3FC", paddingBottom: 20 }}>
-                      <div style={{ fontSize: 13, fontWeight: 800, color: "#18182E", marginBottom: 14 }}>
-                        2. Organization & Licensing
-                      </div>
-
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                        <div>
-                          <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#18182E", marginBottom: 6 }}>
-                            Company / Organization Name *
-                          </label>
-                          <div style={{ position: "relative" }}>
-                            <Building size={16} color="#8E8FA8" style={{ position: "absolute", left: 14, top: 14 }} />
-                            <input
-                              type="text"
-                              required
-                              value={formData.companyName}
-                              onChange={setField("companyName")}
-                              placeholder="e.g. Sun Pharma Laboratories"
-                              style={{
-                                width: "100%",
-                                padding: "11px 14px 11px 42px",
-                                borderRadius: 10,
-                                border: "1px solid #E8EAF6",
-                                fontSize: 14,
-                                color: "#18182E",
-                                outline: "none",
-                                boxSizing: "border-box",
-                              }}
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#18182E", marginBottom: 6 }}>
-                            {selectedRoleConfig.codeLabel || "License Code"} *
-                          </label>
-                          <div style={{ position: "relative" }}>
-                            <KeyRound size={16} color="#8E8FA8" style={{ position: "absolute", left: 14, top: 14 }} />
-                            <input
-                              type="text"
-                              required
-                              value={formData.companyCode}
-                              onChange={setField("companyCode")}
-                              placeholder={selectedRoleConfig.codePlaceholder}
-                              style={{
-                                width: "100%",
-                                padding: "11px 14px 11px 42px",
-                                borderRadius: 10,
-                                border: "1px solid #E8EAF6",
-                                fontSize: 14,
-                                color: "#18182E",
-                                outline: "none",
-                                boxSizing: "border-box",
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* ── Section 3: Identity Verification (Professional Roles Only) ── */}
-                  {isProfessional && (
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 800, color: "#18182E", marginBottom: 14 }}>
-                        3. Identity Documents & Verification Proof
-                      </div>
-
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                        {/* 3.1 Live Camera / Photo Box */}
-                        <div
-                          style={{
-                            border: "1.5px dashed #CBD5E1",
-                            borderRadius: 14,
-                            padding: "16px",
-                            textAlign: "center",
-                            background: "#F8F9FE",
-                          }}
-                        >
-                          <div style={{ fontSize: 12, fontWeight: 800, color: "#18182E", marginBottom: 4 }}>
-                            Identity Photo *
-                          </div>
-                          <div style={{ fontSize: 11, color: "#8E8FA8", marginBottom: 12 }}>
-                            Live photo preferred
-                          </div>
-
-                          {identityPhotoPreview ? (
-                            <div>
-                              <img
-                                src={identityPhotoPreview}
-                                alt="Identity Preview"
-                                style={{
-                                  width: 100,
-                                  height: 100,
-                                  borderRadius: "50%",
-                                  objectFit: "cover",
-                                  margin: "0 auto 10px",
-                                  border: "2px solid #5855F3",
-                                  boxShadow: "0 4px 12px rgba(88, 85, 243, 0.2)",
-                                }}
-                              />
-                              <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
-                                <button
-                                  type="button"
-                                  onClick={openCamera}
-                                  style={{
-                                    fontSize: 11,
-                                    fontWeight: 700,
-                                    padding: "4px 10px",
-                                    borderRadius: 6,
-                                    border: "1px solid #CBD5E1",
-                                    background: "#FFFFFF",
-                                    cursor: "pointer",
-                                  }}
-                                >
-                                  Retake
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setIdentityPhotoFile(null);
-                                    setIdentityPhotoBase64(null);
-                                    setIdentityPhotoPreview(null);
-                                  }}
-                                  style={{
-                                    fontSize: 11,
-                                    fontWeight: 700,
-                                    padding: "4px 10px",
-                                    borderRadius: 6,
-                                    border: "1px solid #FECACA",
-                                    background: "#FEF2F2",
-                                    color: "#DC2626",
-                                    cursor: "pointer",
-                                  }}
-                                >
-                                  Remove
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                              <button
-                                type="button"
-                                onClick={openCamera}
-                                style={{
-                                  background: "#5855F3",
-                                  color: "#FFFFFF",
-                                  border: "none",
-                                  borderRadius: 8,
-                                  padding: "9px 12px",
-                                  fontSize: 12,
-                                  fontWeight: 700,
-                                  cursor: "pointer",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  gap: 6,
-                                }}
-                              >
-                                <Camera size={14} /> Open Camera
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => fileInputPhotoRef.current?.click()}
-                                style={{
-                                  background: "#FFFFFF",
-                                  color: "#5F607A",
-                                  border: "1px solid #CBD5E1",
-                                  borderRadius: 8,
-                                  padding: "8px 12px",
-                                  fontSize: 12,
-                                  fontWeight: 700,
-                                  cursor: "pointer",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  gap: 6,
-                                }}
-                              >
-                                <Upload size={14} /> Upload Photo
-                              </button>
-                            </div>
-                          )}
-
-                          <input
-                            ref={fileInputPhotoRef}
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp"
-                            style={{ display: "none" }}
-                            onChange={handlePhotoFileUpload}
-                          />
-                        </div>
-
-                        {/* 3.2 Government ID Document Box */}
-                        <div
-                          style={{
-                            border: "1.5px dashed #CBD5E1",
-                            borderRadius: 14,
-                            padding: "16px",
-                            textAlign: "center",
-                            background: "#F8F9FE",
-                          }}
-                        >
-                          <div style={{ fontSize: 12, fontWeight: 800, color: "#18182E", marginBottom: 4 }}>
-                            Government ID Proof *
-                          </div>
-                          <div style={{ fontSize: 11, color: "#8E8FA8", marginBottom: 12 }}>
-                            PDF or Image (License / Aadhaar)
-                          </div>
-
-                          {governmentIdPreview ? (
-                            <div
-                              style={{
-                                background: "#FFFFFF",
-                                border: "1px solid #E8EAF6",
-                                borderRadius: 10,
-                                padding: "12px",
-                              }}
-                            >
-                              <FileCheck size={28} color="#059669" style={{ margin: "0 auto 6px" }} />
-                              <div style={{ fontSize: 12, fontWeight: 700, color: "#18182E", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
-                                {governmentIdPreview.name}
-                              </div>
-                              <div style={{ fontSize: 11, color: "#8E8FA8", marginBottom: 8 }}>
-                                {governmentIdPreview.size}
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setGovernmentIdFile(null);
-                                  setGovernmentIdPreview(null);
-                                }}
-                                style={{
-                                  fontSize: 11,
-                                  fontWeight: 700,
-                                  padding: "3px 10px",
-                                  borderRadius: 6,
-                                  border: "1px solid #FECACA",
-                                  background: "#FEF2F2",
-                                  color: "#DC2626",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                Replace File
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => fileInputGovIdRef.current?.click()}
-                              style={{
-                                width: "100%",
-                                height: 86,
-                                background: "#FFFFFF",
-                                color: "#5855F3",
-                                border: "1px solid #CBD5E1",
-                                borderRadius: 8,
-                                fontSize: 12,
-                                fontWeight: 700,
-                                cursor: "pointer",
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                gap: 6,
-                              }}
-                            >
-                              <Upload size={18} />
-                              <span>Select Document</span>
-                            </button>
-                          )}
-
-                          <input
-                            ref={fileInputGovIdRef}
-                            type="file"
-                            accept="application/pdf,image/jpeg,image/png,image/webp"
-                            style={{ display: "none" }}
-                            onChange={handleGovernmentIdUpload}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* ── Submit Action Button ── */}
-                  <div style={{ marginTop: 12 }}>
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="btn-primary"
-                      style={{
-                        width: "100%",
-                        padding: "13px",
-                        fontSize: 14,
-                        fontWeight: 800,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 8,
-                        borderRadius: 12,
-                      }}
-                    >
-                      {loading ? (
-                        <>
-                          <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> Submitting Application...
-                        </>
-                      ) : isProfessional ? (
-                        <>
-                          Submit Application for Creator Review <ArrowRight size={16} />
-                        </>
-                      ) : (
-                        <>
-                          Create Account & Sign In <ArrowRight size={16} />
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </form>
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-700">
+                Select Your Participant Role
+              </h3>
             </div>
+
+            <RoleSelector selectedRole={selectedRole} onSelectRole={setSelectedRole} />
           </div>
-        )}
-      </main>
 
-      {/* ── LIVE WEBRTC CAMERA MODAL ── */}
-      {isCameraOpen && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: "rgba(0,0,0,0.75)",
-            zIndex: 1000,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 20,
-          }}
-        >
-          <div
-            style={{
-              background: "#FFFFFF",
-              borderRadius: 20,
-              maxWidth: 520,
-              width: "100%",
-              overflow: "hidden",
-              boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
-            }}
-          >
-            <div
-              style={{
-                padding: "16px 20px",
-                borderBottom: "1px solid #E8EAF6",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <Camera size={18} color="#5855F3" />
-                <span style={{ fontSize: 14, fontWeight: 800, color: "#18182E" }}>
-                  Live Camera Identity Capture
-                </span>
+          {/* ══ REGISTRATION FORM ══ */}
+          <form onSubmit={handleSubmit} className="space-y-8">
+            {/* ══ SECTION 1: ACCOUNT & PERSONAL CREDENTIALS ══ */}
+            <div className="p-5 sm:p-6 rounded-2xl bg-slate-50/70 border border-slate-200/80 space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-slate-200/60">
+                <div className="w-5 h-5 rounded-full bg-sky-600 text-white flex items-center justify-center font-bold text-[10px]">
+                  2
+                </div>
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-700">
+                  Account & Personal Credentials
+                </h3>
               </div>
-              <button
-                type="button"
-                onClick={closeCamera}
-                style={{ background: "none", border: "none", cursor: "pointer", color: "#8E8FA8" }}
-              >
-                <X size={20} />
-              </button>
-            </div>
 
-            <div style={{ padding: 20, textAlign: "center" }}>
-              {cameraError ? (
-                <div style={{ padding: 24, color: "#DC2626", fontSize: 13 }}>
-                  <AlertTriangle size={32} style={{ margin: "0 auto 10px" }} />
-                  {cameraError}
-                </div>
-              ) : capturedPhoto ? (
-                <div>
-                  <img
-                    src={capturedPhoto}
-                    alt="Captured Identity"
-                    style={{ width: "100%", height: 300, objectFit: "cover", borderRadius: 12, marginBottom: 16 }}
-                  />
-                  <div style={{ display: "flex", gap: 10 }}>
-                    <button
-                      type="button"
-                      onClick={() => setCapturedPhoto(null)}
-                      style={{ flex: 1, padding: "10px", borderRadius: 8, border: "1px solid #CBD5E1", background: "#FFFFFF", fontWeight: 700, cursor: "pointer" }}
-                    >
-                      Retake
-                    </button>
-                    <button
-                      type="button"
-                      onClick={useThisCapturedPhoto}
-                      className="btn-primary"
-                      style={{ flex: 1, padding: "10px", borderRadius: 8, fontWeight: 800 }}
-                    >
-                      Use This Photo
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    style={{ width: "100%", height: 300, objectFit: "cover", borderRadius: 12, background: "#000000", marginBottom: 16 }}
-                  />
-                  <canvas ref={canvasRef} style={{ display: "none" }} />
-                  <button
-                    type="button"
-                    onClick={captureSnapshot}
-                    className="btn-primary"
-                    style={{ width: "100%", padding: "11px", fontWeight: 800, fontSize: 13 }}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormInput
+                  label="Full Legal Name"
+                  type="text"
+                  required
+                  placeholder="e.g. Dr. Rajesh Sharma"
+                  value={formData.fullName}
+                  onChange={setField("fullName")}
+                  icon={User}
+                />
+
+                <FormInput
+                  label="Work / Official Email"
+                  type="email"
+                  required
+                  placeholder="e.g. contact@sunpharma.com"
+                  value={formData.email}
+                  onChange={setField("email")}
+                  icon={Mail}
+                  rightLabelAction={
+                    isEmailVerified ? (
+                      <span className="text-emerald-600 font-bold flex items-center gap-1">
+                        <CheckCircle2 size={12} /> Verified
+                      </span>
+                    ) : undefined
+                  }
+                />
+              </div>
+
+              {/* OTP Input Drawer (Shown if user clicks Verify via OTP) */}
+              <AnimatePresence>
+                {otpStep && !isEmailVerified && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="p-4 rounded-xl bg-white border border-sky-200 shadow-sm space-y-3"
                   >
-                    📸 Capture Photo
-                  </button>
-                </div>
+                    <div className="text-center">
+                      <p className="text-xs font-bold text-slate-800">
+                        Enter 6-Digit Email Verification Code
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        Sent to <strong className="text-slate-700">{formData.email}</strong>
+                      </p>
+                    </div>
+
+                    <OtpInput
+                      value={otpCode}
+                      onChange={setOtpCode}
+                      onResend={handleSendOtp}
+                      isResending={isOtpSending}
+                    />
+
+                    <div className="flex justify-center gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setOtpStep(false)}
+                        className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleVerifyOtp}
+                        disabled={isOtpVerifying || otpCode.length < 6}
+                        className="px-4 py-1.5 rounded-lg bg-sky-600 text-white font-bold text-xs shadow-xs disabled:opacity-50"
+                      >
+                        {isOtpVerifying ? "Verifying..." : "Confirm OTP"}
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormInput
+                  label="Create Password"
+                  type="password"
+                  required
+                  placeholder="At least 6 characters"
+                  value={formData.password}
+                  onChange={setField("password")}
+                  icon={Lock}
+                  helperText="Must be minimum 6 characters with mixed case recommended"
+                />
+
+                <FormInput
+                  label="Confirm Password"
+                  type="password"
+                  required
+                  placeholder="Re-enter password"
+                  value={formData.confirmPassword}
+                  onChange={setField("confirmPassword")}
+                  icon={Lock}
+                  error={
+                    formData.confirmPassword &&
+                    formData.password !== formData.confirmPassword
+                      ? "Passwords do not match"
+                      : undefined
+                  }
+                />
+              </div>
+
+              {isProfessional && (
+                <FormInput
+                  label="Contact Phone Number"
+                  type="tel"
+                  required
+                  placeholder="e.g. +91 98765 43210"
+                  value={formData.phone}
+                  onChange={setField("phone")}
+                  icon={Phone}
+                  helperText="Used for automated supply chain dispatch & critical tamper alerts"
+                />
               )}
             </div>
+
+            {/* ══ SECTION 2: ORGANIZATION & LICENSING (FOR PROFESSIONALS) ══ */}
+            {isProfessional && (
+              <div className="p-5 sm:p-6 rounded-2xl bg-slate-50/70 border border-slate-200/80 space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-slate-200/60">
+                  <div className="w-5 h-5 rounded-full bg-teal-600 text-white flex items-center justify-center font-bold text-[10px]">
+                    3
+                  </div>
+                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-700">
+                    Organization & Regulatory Licensing
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <FormInput
+                    label="Organization / Company Name"
+                    type="text"
+                    required
+                    placeholder="e.g. Sun Pharmaceutical Industries Ltd."
+                    value={formData.companyName}
+                    onChange={setField("companyName")}
+                    icon={Building2}
+                  />
+
+                  <FormInput
+                    label={selectedRoleConfig.codeLabel || "Official License Number"}
+                    type="text"
+                    required
+                    placeholder={selectedRoleConfig.codePlaceholder || "e.g. LIC-2026-904"}
+                    value={formData.companyCode}
+                    onChange={setField("companyCode")}
+                    icon={KeyRound}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                    Government Identification Proof Type *
+                  </label>
+                  <select
+                    value={formData.governmentIdType}
+                    onChange={setField("governmentIdType")}
+                    className="w-full py-3 px-4 text-sm text-slate-900 bg-white/95 rounded-xl border border-slate-200/90 focus:border-sky-500 focus:ring-3 focus:ring-sky-100 outline-none font-medium shadow-2xs"
+                  >
+                    <option value="Government Identity Document (Aadhaar / Passport / License)">
+                      National ID (Aadhaar / Passport / Driver License)
+                    </option>
+                    <option value="State Pharmacy Council Registration">
+                      State Pharmacy Council Registration Certificate
+                    </option>
+                    <option value="Drug Manufacturing / Wholesale Distribution License">
+                      Drug Manufacturing / Wholesale Distribution License
+                    </option>
+                    <option value="FDA / CDSCO Establishment Certificate">
+                      FDA / CDSCO Regulatory Establishment Certificate
+                    </option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {/* ══ SECTION 3: IDENTITY DOCUMENTS & VERIFICATION PROOF ══ */}
+            {isProfessional && (
+              <div className="p-5 sm:p-6 rounded-2xl bg-slate-50/70 border border-slate-200/80 space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-slate-200/60">
+                  <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-[10px]">
+                    4
+                  </div>
+                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-700">
+                    Identity Documents & Proof of Authority
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Identity Photo (Live Camera or Upload) */}
+                  <FileUploadCard
+                    title="Identity Photo of Authorized Representative"
+                    subtitle="Live selfie or clear headshot JPG/PNG"
+                    required
+                    file={identityPhotoFile}
+                    previewUrl={identityPhotoPreview || identityPhotoBase64}
+                    hasCamera
+                    onOpenCamera={() => setIsCameraOpen(true)}
+                    onFileSelect={handlePhotoFileUpload}
+                    onClear={() => {
+                      setIdentityPhotoFile(null);
+                      setIdentityPhotoPreview(null);
+                      setIdentityPhotoBase64(null);
+                    }}
+                  />
+
+                  {/* Government ID Document Upload */}
+                  <FileUploadCard
+                    title="Government / Licensing Proof Document"
+                    subtitle="PDF or scanned high-res image (Max 10MB)"
+                    required
+                    file={governmentIdFile}
+                    onFileSelect={handleGovernmentIdUpload}
+                    onClear={() => setGovernmentIdFile(null)}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* ══ SUBMIT BUTTON & TERMS ══ */}
+            <div className="pt-2 space-y-4">
+              <div className="p-3.5 rounded-xl bg-sky-50/70 border border-sky-100 flex items-start gap-2.5 text-xs text-sky-800">
+                <Info size={16} className="text-sky-600 shrink-0 mt-0.5" />
+                <p className="leading-relaxed">
+                  By submitting your application, you certify that all pharmaceutical licensing
+                  credentials are authentic. Professional applications undergo mandatory cryptographic
+                  audit by the system Super Admin.
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-4 px-6 rounded-xl bg-gradient-to-r from-sky-600 via-sky-500 to-teal-500 hover:from-sky-500 hover:to-teal-400 text-white font-black text-sm sm:text-base shadow-xl shadow-sky-600/25 hover:shadow-sky-600/35 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.99]"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    <span>Registering Account & Minting Credentials...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Submit {selectedRole} Registration</span>
+                    <ArrowRight size={18} />
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        </motion.div>
+      </main>
+
+      {/* ── Footer ── */}
+      <footer className="relative z-10 w-full max-w-4xl mx-auto mt-6 text-center text-[11px] text-slate-400 font-medium">
+        © 2026 MediChainAI — Autonomous Pharmaceutical Blockchain Traceability Network.
+      </footer>
+
+      {/* ── CAMERA MODAL ── */}
+      <CameraCaptureModal
+        isOpen={isCameraOpen}
+        onClose={() => setIsCameraOpen(false)}
+        onPhotoCaptured={(base64Data) => {
+          setIdentityPhotoBase64(base64Data);
+          setIdentityPhotoPreview(base64Data);
+          setIdentityPhotoFile(null);
+          toast.success("Live identity photo captured!");
+        }}
+      />
+
+      {/* ── REGISTRATION OTP VERIFICATION MODAL ── */}
+      <AnimatePresence>
+        {otpStep && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative w-full max-w-md bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-200 text-center"
+            >
+              <div className="w-14 h-14 rounded-2xl bg-sky-50 border border-sky-200 text-sky-600 flex items-center justify-center mx-auto mb-3 shadow-inner">
+                <KeyRound size={28} />
+              </div>
+
+              <h3 className="text-xl font-black text-slate-900 tracking-tight">
+                Verify Your Email Address
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-xs mx-auto">
+                A 6-digit verification code was dispatched to{" "}
+                <strong className="text-slate-800 font-mono font-bold">
+                  {formData.email}
+                </strong>
+              </p>
+              <span className="inline-block mt-2 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-sky-100 text-sky-800 uppercase tracking-wider border border-sky-200">
+                {selectedRole} Registration
+              </span>
+
+              <div className="my-6">
+                <OtpInput
+                  length={6}
+                  value={otpCode}
+                  onChange={setOtpCode}
+                  onResend={handleResendRegistrationOtp}
+                  isResending={isOtpSending}
+                />
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={handleVerifyOtp}
+                  disabled={isOtpVerifying || otpCode.length < 6}
+                  className="w-full py-3.5 px-5 rounded-xl bg-gradient-to-r from-sky-600 to-teal-600 hover:from-sky-500 hover:to-teal-500 text-white font-extrabold text-sm shadow-md shadow-sky-600/20 disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
+                >
+                  {isOtpVerifying ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Verifying Security Code...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Verify & Complete Registration</span>
+                      <ArrowRight size={16} />
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    sessionStorage.removeItem("pending_reg_id");
+                    sessionStorage.removeItem("pending_reg_email");
+                    setPendingRegId("");
+                    setOtpStep(false);
+                  }}
+                  className="w-full text-center text-xs font-semibold text-slate-400 hover:text-slate-700 transition-colors"
+                >
+                  ← Edit registration details
+                </button>
+              </div>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
+
+      {/* ── APPLICATION SUBMITTED CONFIRMATION MODAL ── */}
+      <AnimatePresence>
+        {submittedSuccess && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative w-full max-w-md bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-200 text-center"
+            >
+              <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-4 border border-emerald-100 shadow-sm">
+                <CheckCircle2 size={36} strokeWidth={2.2} />
+              </div>
+
+              <h3 className="text-xl font-black text-slate-900 tracking-tight">
+                Application Submitted!
+              </h3>
+              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                Your application for{" "}
+                <strong className="text-slate-800">{formData.companyName || selectedRole}</strong> has
+                been queued for Super Admin review.
+              </p>
+
+              <div className="my-5 p-4 rounded-2xl bg-slate-50 border border-slate-200 text-left text-xs space-y-1.5 font-medium">
+                <p className="text-slate-500">
+                  Registered Email: <span className="text-slate-900 font-bold">{formData.email}</span>
+                </p>
+                <p className="text-slate-500">
+                  Role Requested: <span className="text-sky-700 font-bold">{selectedRole}</span>
+                </p>
+                <p className="text-slate-500">
+                  Next Step:{" "}
+                  <span className="text-emerald-700 font-bold">
+                    Approval confirmation email will be sent
+                  </span>
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => navigate("/login")}
+                className="w-full py-3 px-5 rounded-xl bg-gradient-to-r from-sky-600 to-teal-600 text-white font-bold text-xs shadow-md shadow-sky-600/20 hover:scale-[1.01] active:scale-[0.99] transition-all"
+              >
+                Proceed to Sign In
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

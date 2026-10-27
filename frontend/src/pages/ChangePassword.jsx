@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Lock, CheckCircle2, ShieldCheck, ArrowRight, Loader2, AlertCircle } from "lucide-react";
-import Background from "../components/layout/Background";
+import { motion } from "framer-motion";
+import { Lock, CheckCircle2, ShieldCheck, ArrowRight, Loader2 } from "lucide-react";
+import AuthBackground from "../components/auth/AuthBackground";
+import AuthHeader from "../components/auth/AuthHeader";
+import FormInput from "../components/auth/FormInput";
 import { authService } from "../services/authService";
 import { useApp } from "../context/AppContext";
 import toast, { Toaster } from "react-hot-toast";
@@ -31,7 +34,7 @@ export default function ChangePassword() {
       const res = await authService.changePassword(newPassword, confirmPassword);
       if (res.success) {
         setSuccess(true);
-        toast.success("Password set successfully!");
+        toast.success("Permanent password created successfully!");
         if (user) {
           setUser({ ...user, mustChangePassword: false });
         }
@@ -42,7 +45,7 @@ export default function ChangePassword() {
           else if (role === "pharmacy") navigate("/pharmacy");
           else if (role === "creator") navigate("/creator");
           else navigate("/customer");
-        }, 1500);
+        }, 1200);
       } else {
         toast.error(res.message || "Failed to update password.");
       }
@@ -54,215 +57,100 @@ export default function ChangePassword() {
   };
 
   return (
-    <div
-      className="page-bg"
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "32px 20px",
-      }}
-    >
-      <Background />
+    <div className="relative min-h-screen flex flex-col justify-between py-6 sm:py-10 px-4 sm:px-6 lg:px-8 text-slate-900 select-none">
+      <AuthBackground />
       <Toaster position="top-right" />
 
-      <div style={{ maxWidth: 460, width: "100%", position: "relative", zIndex: 1 }}>
-        <div
-          style={{
-            background: "#FFFFFF",
-            border: "1px solid #E8EAF6",
-            borderRadius: 24,
-            padding: "36px 32px",
-            boxShadow: "0 12px 40px rgba(88, 85, 243, 0.08)",
-          }}
-        >
-          <div style={{ textAlign: "center", marginBottom: 28 }}>
-            <div
-              style={{
-                width: 56,
-                height: 56,
-                borderRadius: 16,
-                background: "linear-gradient(135deg, #5855F3, #4743EB)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                margin: "0 auto 16px",
-                boxShadow: "0 8px 24px rgba(88,85,243,0.25)",
-              }}
-            >
-              <ShieldCheck size={28} color="white" />
-            </div>
+      {/* ── Brand Header ── */}
+      <AuthHeader currentAction="change-password" />
 
-            <h1
-              style={{
-                fontFamily: "'Plus Jakarta Sans', sans-serif",
-                fontSize: "1.75rem",
-                fontWeight: 800,
-                color: "#18182E",
-                marginBottom: 6,
-                letterSpacing: "-0.02em",
-              }}
-            >
-              Create Your New Password
-            </h1>
-            <p style={{ fontSize: 13, color: "#5F607A", lineHeight: 1.5 }}>
-              Your account has been approved. For supply-chain security, please replace your temporary password with a secure permanent password.
-            </p>
+      {/* ── Main Container ── */}
+      <main className="relative z-10 w-full max-w-md mx-auto my-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          className="bg-white/95 backdrop-blur-2xl border border-white/80 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-sky-950/10 text-center"
+        >
+          {/* Shield Badge */}
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-sky-600 via-sky-500 to-teal-400 text-white flex items-center justify-center mx-auto mb-4 shadow-md shadow-sky-600/25">
+            <ShieldCheck size={24} />
           </div>
 
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+            Create Permanent Password
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1 mb-6 leading-relaxed">
+            Your application has been approved. For pharmaceutical integrity and account protection,
+            please replace your temporary credentials with a secure permanent password.
+          </p>
+
           {success ? (
-            <div style={{ textAlign: "center", padding: "20px 0" }}>
-              <div
-                style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: "50%",
-                  background: "#ECFDF5",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  margin: "0 auto 16px",
-                  color: "#10B981",
-                }}
-              >
+            <div className="py-6 space-y-3">
+              <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto border border-emerald-100 shadow-sm animate-bounce">
                 <CheckCircle2 size={36} />
               </div>
-              <h3 style={{ fontSize: 18, fontWeight: 800, color: "#18182E", marginBottom: 6 }}>
-                Password Updated!
+              <h3 className="text-base font-extrabold text-slate-900">
+                Password Successfully Updated!
               </h3>
-              <p style={{ fontSize: 13, color: "#5F607A" }}>
-                Redirecting to your authorized dashboard...
+              <p className="text-xs text-slate-500">
+                Redirecting to your authorized workspace...
               </p>
             </div>
           ) : (
-            <form onSubmit={handleSubmit}>
-              <div style={{ display: "grid", gap: 16 }}>
-                <div>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: "#18182E",
-                      marginBottom: 6,
-                    }}
-                  >
-                    New Permanent Password *
-                  </label>
-                  <div style={{ position: "relative" }}>
-                    <Lock
-                      size={16}
-                      color="#8E8FA8"
-                      style={{ position: "absolute", left: 14, top: 14 }}
-                    />
-                    <input
-                      type="password"
-                      required
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="At least 6 characters"
-                      style={{
-                        width: "100%",
-                        padding: "12px 14px 12px 42px",
-                        borderRadius: 12,
-                        border: "1px solid #E8EAF6",
-                        fontSize: 14,
-                        color: "#18182E",
-                        outline: "none",
-                        boxSizing: "border-box",
-                      }}
-                    />
-                  </div>
-                </div>
+            <form onSubmit={handleSubmit} className="space-y-4 text-left">
+              <FormInput
+                label="New Permanent Password"
+                type="password"
+                required
+                icon={Lock}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Minimum 6 characters"
+                helperText="Must be minimum 6 characters with mixed case recommended"
+              />
 
-                <div>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: "#18182E",
-                      marginBottom: 6,
-                    }}
-                  >
-                    Confirm New Password *
-                  </label>
-                  <div style={{ position: "relative" }}>
-                    <Lock
-                      size={16}
-                      color="#8E8FA8"
-                      style={{ position: "absolute", left: 14, top: 14 }}
-                    />
-                    <input
-                      type="password"
-                      required
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="Re-enter your new password"
-                      style={{
-                        width: "100%",
-                        padding: "12px 14px 12px 42px",
-                        borderRadius: 12,
-                        border: "1px solid #E8EAF6",
-                        fontSize: 14,
-                        color: "#18182E",
-                        outline: "none",
-                        boxSizing: "border-box",
-                      }}
-                    />
-                  </div>
-                </div>
+              <FormInput
+                label="Confirm Permanent Password"
+                type="password"
+                required
+                icon={Lock}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Re-enter new password"
+                error={
+                  confirmPassword && newPassword !== confirmPassword
+                    ? "Passwords do not match"
+                    : undefined
+                }
+              />
 
-                <div
-                  style={{
-                    background: "#F8F9FE",
-                    borderRadius: 10,
-                    padding: "12px 14px",
-                    display: "flex",
-                    gap: 10,
-                    fontSize: 12,
-                    color: "#5F607A",
-                    lineHeight: 1.4,
-                  }}
-                >
-                  <AlertCircle size={16} color="#5855F3" style={{ flexShrink: 0, marginTop: 2 }} />
-                  <div>Once updated, your temporary email password will be permanently deactivated.</div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="btn-primary"
-                  style={{
-                    width: "100%",
-                    padding: "14px",
-                    fontSize: 15,
-                    fontWeight: 800,
-                    marginTop: 8,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 8,
-                  }}
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />
-                      Saving New Password...
-                    </>
-                  ) : (
-                    <>
-                      Update Password & Access Dashboard <ArrowRight size={16} />
-                    </>
-                  )}
-                </button>
-              </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full mt-2 py-3.5 px-6 rounded-xl bg-gradient-to-r from-sky-600 via-sky-500 to-teal-500 hover:from-sky-500 hover:to-teal-400 text-white font-black text-xs sm:text-sm shadow-lg shadow-sky-600/25 transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-[0.99]"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Saving Secure Credentials...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Set Permanent Password</span>
+                    <ArrowRight size={16} />
+                  </>
+                )}
+              </button>
             </form>
           )}
-        </div>
-      </div>
+        </motion.div>
+      </main>
+
+      {/* ── Footer ── */}
+      <footer className="relative z-10 w-full max-w-md mx-auto mt-6 text-center text-[11px] text-slate-400 font-medium">
+        © 2026 MediChainAI — Autonomous Pharmaceutical Blockchain Traceability Network.
+      </footer>
     </div>
   );
 }

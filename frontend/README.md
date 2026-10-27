@@ -36,7 +36,7 @@ npm run dev               # http://localhost:5173
 | `/register`          | public                | Register          |
 | `/change-password`   | after first login     | ChangePassword    |
 | `/profile`           | any approved user     | Profile           |
-| `/verify/:id`        | any approved user     | VerifyResult      |
+| `/verify/:id`        | public                | VerifyResult      |
 | `/creator/*`         | Creator               | Creator console   |
 | `/manufacturer`      | Manufacturer          | Manufacturer      |
 | `/distributor`       | Distributor           | Distributor       |

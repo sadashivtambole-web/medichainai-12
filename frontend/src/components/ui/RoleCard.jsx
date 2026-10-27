@@ -8,30 +8,30 @@ export default function RoleCard({ icon: Icon, title, description, color, route,
   const isYellow = color === "yellow";
 
   const glowColor = isBlue
-    ? "rgba(99, 102, 241, 0.22)"
+    ? "rgba(2, 132, 199, 0.22)"
     : isGreen
     ? "rgba(16, 185, 129, 0.22)"
     : isYellow
     ? "rgba(245, 158, 11, 0.22)"
-    : "rgba(139, 92, 246, 0.22)";
+    : "rgba(13, 148, 136, 0.22)";
 
   const iconBg = isBlue
-    ? "linear-gradient(135deg, #4F46E5, #6366F1)"
+    ? "linear-gradient(135deg, #0284C7, #0369A1)"
     : isGreen
     ? "linear-gradient(135deg, #059669, #10B981)"
     : isYellow
     ? "linear-gradient(135deg, #D97706, #F59E0B)"
-    : "linear-gradient(135deg, #7C3AED, #8B5CF6)";
+    : "linear-gradient(135deg, #0D9488, #14B8A6)";
 
-  const statColor = isBlue ? "#4F46E5" : isGreen ? "#059669" : isYellow ? "#D97706" : "#7C3AED";
-  const badgeBg = isBlue ? "rgba(99,102,241,0.08)" : isGreen ? "rgba(16,185,129,0.08)" : isYellow ? "rgba(245,158,11,0.08)" : "rgba(139,92,246,0.08)";
+  const statColor = isBlue ? "#0284C7" : isGreen ? "#059669" : isYellow ? "#D97706" : "#0D9488";
+  const badgeBg = isBlue ? "rgba(2,132,199,0.08)" : isGreen ? "rgba(16,185,129,0.08)" : isYellow ? "rgba(245,158,11,0.08)" : "rgba(13,148,136,0.08)";
 
   return (
     <button
       id={`role-card-${title.toLowerCase()}`}
       onClick={() => navigate(route)}
       style={{
-        background: "rgba(255, 255, 255, 0.92)",
+        background: "rgba(255, 255, 255, 0.95)",
         backdropFilter: "blur(14px)",
         border: "1px solid rgba(226, 232, 240, 0.85)",
         borderRadius: 22,
@@ -42,7 +42,7 @@ export default function RoleCard({ icon: Icon, title, description, color, route,
         position: "relative",
         overflow: "hidden",
         width: "100%",
-        boxShadow: "0 4px 20px rgba(99, 102, 241, 0.04), 0 1px 3px rgba(0,0,0,0.02)",
+        boxShadow: "0 4px 20px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(0,0,0,0.02)",
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
@@ -50,12 +50,12 @@ export default function RoleCard({ icon: Icon, title, description, color, route,
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = "translateY(-6px)";
-        e.currentTarget.style.boxShadow = `0 20px 40px -10px ${glowColor}, 0 0 0 1px rgba(99, 102, 241, 0.3)`;
-        e.currentTarget.style.borderColor = "rgba(99, 102, 241, 0.4)";
+        e.currentTarget.style.boxShadow = `0 20px 40px -10px ${glowColor}, 0 0 0 1px rgba(2, 132, 199, 0.3)`;
+        e.currentTarget.style.borderColor = "rgba(2, 132, 199, 0.4)";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = "translateY(0)";
-        e.currentTarget.style.boxShadow = "0 4px 20px rgba(99, 102, 241, 0.04), 0 1px 3px rgba(0,0,0,0.02)";
+        e.currentTarget.style.boxShadow = "0 4px 20px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(0,0,0,0.02)";
         e.currentTarget.style.borderColor = "rgba(226, 232, 240, 0.85)";
       }}
     >

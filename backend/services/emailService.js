@@ -1,214 +1,451 @@
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
+import { logger } from "../utils/logger.js";
 
 dotenv.config();
 
-class EmailService {
+// ── App branding (override via .env) ─────────────────────────────────────
+const APP_NAME      = process.env.APP_NAME      || "MediChainAI";
+const APP_TAGLINE   = process.env.APP_TAGLINE   || "Secure Pharmaceutical Supply Chain";
+const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || "support@medichain.ai";
+const BRAND_COLOR   = process.env.BRAND_COLOR   || "#4F46E5";
+
+export class EmailService {
   constructor() {
     this.transporter = null;
-    this.initTransporter();
+    this._initTransporter();
   }
 
-  initTransporter() {
+  _initTransporter() {
+    // Support test transport for automated testing environments
+    if (process.env.USE_TEST_EMAIL === "true") {
+      this.transporter = nodemailer.createTransport({
+        jsonTransport: true,
+      });
+      logger.info("🧪 Email Service initialized with mock/test JSON transport.");
+      return;
+    }
+
     const service = process.env.SMTP_SERVICE;
-    const host = process.env.SMTP_HOST;
-    const port = parseInt(process.env.SMTP_PORT || "465", 10);
-    const user = process.env.SMTP_USER;
-    const pass = process.env.SMTP_PASSWORD;
+    const host    = process.env.SMTP_HOST;
+    const port    = parseInt(process.env.SMTP_PORT || "465", 10);
+    const secure  = process.env.SMTP_SECURE === "false" ? false : (port === 465);
+    const user    = process.env.SMTP_USER || process.env.EMAIL_USER;
+    const pass    = process.env.SMTP_PASS || process.env.SMTP_PASSWORD || process.env.EMAIL_PASS;
 
     if (user && pass) {
-      if (service && service.toLowerCase() === "gmail") {
-        this.transporter = nodemailer.createTransport({
-          service: "gmail",
-          auth: { user, pass },
-        });
-      } else if (host) {
-        this.transporter = nodemailer.createTransport({
-          host,
-          port,
-          secure: port === 465,
-          auth: { user, pass },
-        });
-      } else {
-        // Default to standard Gmail SMTP if host not specified
-        this.transporter = nodemailer.createTransport({
-          service: "gmail",
-          auth: { user, pass },
-        });
-      }
-      console.log(`📡 Email Service configured for real-time dispatch via: ${user}`);
+      const transportConfig = service && service.toLowerCase() === "gmail"
+        ? {
+            service: "gmail",
+            auth: { user, pass },
+          }
+        : host
+        ? {
+            host,
+            port,
+            secure,
+            auth: { user, pass },
+            tls: { rejectUnauthorized: false },
+          }
+        : {
+            service: "gmail",
+            auth: { user, pass },
+          };
+
+      this.transporter = nodemailer.createTransport(transportConfig);
+      logger.info(`📡 Email Service configured via SMTP (${user})`);
     } else {
-      console.log("ℹ️ Email Service running in local simulated mode (No SMTP credentials in .env)");
+      this.transporter = null;
+      logger.warn("⚠️  Email Service: No SMTP credentials in .env (SMTP_USER/SMTP_PASS). Real emails will NOT be sent until SMTP is configured.");
     }
   }
 
   /**
-   * Send Account Approval Email with Temporary Password
-   * @param {Object} params
-   * @param {string} params.toEmail
-   * @param {string} params.fullName
-   * @param {string} params.role
-   * @param {string} params.temporaryPassword
+   * Verify SMTP connection health without throwing unhandled exceptions.
+   * Returns { ok: boolean, error?: string }
    */
-  async sendApprovalEmail({ toEmail, fullName, role, temporaryPassword }) {
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5174";
-    const loginUrl = `${frontendUrl}/login`;
-    const fromAddress = process.env.SMTP_FROM || '"Fake Drug Detection Administration" <noreply@drugchain.network>';
+  async verifyConnection() {
+    if (!this.transporter) {
+      return {
+        ok: false,
+        error: "SMTP transporter not initialized. Missing SMTP_USER or SMTP_PASS in backend/.env",
+      };
+    }
+    try {
+      await this.transporter.verify();
+      return { ok: true };
+    } catch (err) {
+      logger.error("SMTP transporter verification failed", { error: err.message });
+      return { ok: false, error: err.message };
+    }
+  }
 
-    const subject = "Fake Drug Detection — Account Approved";
-    const textContent = `Hello ${fullName},
+  /** Shared HTML wrapper with MediChainAI header/footer */
+  _htmlWrapper(bodyHtml) {
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>${APP_NAME} Notification</title>
+</head>
+<body style="margin:0;padding:0;background:#F1F5F9;font-family:'Segoe UI',Arial,sans-serif;-webkit-font-smoothing:antialiased;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#F1F5F9;padding:32px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0"
+        style="background:#ffffff;border-radius:16px;overflow:hidden;
+               box-shadow:0 4px 24px rgba(0,0,0,0.08);max-width:600px;width:100%;">
+        <tr>
+          <td style="background:linear-gradient(135deg,${BRAND_COLOR},#7C3AED);padding:32px 36px;text-align:center;">
+            <div style="font-size:24px;font-weight:900;color:#ffffff;letter-spacing:-0.02em;">🏥 ${APP_NAME}</div>
+            <div style="font-size:13px;color:rgba(255,255,255,0.88);margin-top:6px;">${APP_TAGLINE}</div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:36px;">${bodyHtml}</td>
+        </tr>
+        <tr>
+          <td style="background:#F8FAFC;border-top:1px solid #E2E8F0;padding:20px 36px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#94A3B8;line-height:1.6;">
+              This is an automated system notification from <strong>${APP_NAME}</strong>.<br/>
+              Need assistance? Contact our compliance support at <a href="mailto:${SUPPORT_EMAIL}" style="color:${BRAND_COLOR};text-decoration:none;">${SUPPORT_EMAIL}</a>.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+  }
 
-Your ${role} account has been approved.
+  /**
+   * Internal dispatcher — returns { success, mode, messageId?, error? }
+   * Truthful dispatch: Never reports success if SMTP is not configured or failed!
+   */
+  async _dispatch({ to, subject, text, html }) {
+    // Validate recipient
+    if (!to || !to.includes("@")) {
+      const err = `Invalid recipient email address: "${to}"`;
+      logger.error(`[EMAIL ERROR] ${err}`);
+      return { success: false, mode: "INVALID_RECIPIENT", error: err };
+    }
 
-You can now access the Fake Drug Detection platform.
-
-Login Email:
-${toEmail}
-
-Temporary Password:
-${temporaryPassword}
-
-Login:
-${loginUrl}
-
-For security, you will be required to change this temporary password when you first log in.
-
-If you did not submit this registration, please contact the system administrator.
-
-Regards,
-
-Fake Drug Detection
-System Administration`;
-
-    const htmlContent = `
-    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e8eaf6; border-radius: 12px; overflow: hidden; color: #18182e;">
-      <div style="background: #5855f3; padding: 24px; text-align: center; color: #ffffff;">
-        <h2 style="margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.02em;">Fake Drug Detection Platform</h2>
-        <p style="margin: 4px 0 0; font-size: 13px; opacity: 0.9;">Secure Pharmaceutical Supply Chain</p>
-      </div>
-      <div style="padding: 32px 28px;">
-        <p style="font-size: 16px; margin-top: 0;">Hello <strong>${fullName}</strong>,</p>
-        <p style="font-size: 14px; color: #5f607a; line-height: 1.6;">
-          Your <strong>${role}</strong> account has been reviewed and <span style="color: #10b981; font-weight: bold;">APPROVED</span> by the Creator / Super Admin.
-        </p>
-        
-        <div style="background: #f8f9fd; border: 1px solid #e8eaf6; border-radius: 8px; padding: 20px; margin: 24px 0;">
-          <div style="font-size: 11px; text-transform: uppercase; font-weight: 800; color: #8c8ca1; letter-spacing: 0.05em; margin-bottom: 4px;">Login Email</div>
-          <div style="font-size: 14px; font-weight: 700; color: #18182e; margin-bottom: 16px;">${toEmail}</div>
-
-          <div style="font-size: 11px; text-transform: uppercase; font-weight: 800; color: #8c8ca1; letter-spacing: 0.05em; margin-bottom: 4px;">Temporary Password</div>
-          <div style="font-size: 16px; font-family: monospace; font-weight: 800; color: #5855f3; background: #ffffff; padding: 10px 14px; border: 1px dashed #5855f3; border-radius: 6px; display: inline-block;">${temporaryPassword}</div>
-        </div>
-
-        <div style="text-align: center; margin: 30px 0;">
-          <a href="${loginUrl}" style="background: #5855f3; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 14px; display: inline-block;">Login to Platform</a>
-        </div>
-
-        <div style="background: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; padding: 14px; font-size: 12px; color: #92400e; line-height: 1.5;">
-          <strong>Security Notice:</strong> You will be required to change this temporary password immediately upon your first login.
-        </div>
-
-        <p style="font-size: 12px; color: #8c8ca1; margin-top: 30px; line-height: 1.5;">
-          If you did not submit this registration, please contact the system administrator immediately.<br/><br/>
-          Regards,<br/>
-          <strong>Fake Drug Detection System Administration</strong>
-        </p>
-      </div>
-    </div>`;
+    // Determine sender address
+    const smtpUser = process.env.SMTP_USER || process.env.EMAIL_USER;
+    const fromAddress = process.env.SMTP_FROM || process.env.MAIL_FROM || process.env.EMAIL_FROM || (smtpUser ? `"${APP_NAME}" <${smtpUser}>` : `"${APP_NAME}" <no-reply@medichain.ai>`);
 
     if (this.transporter) {
       try {
-        await this.transporter.sendMail({
+        const info = await this.transporter.sendMail({
           from: fromAddress,
-          to: toEmail,
+          to,
           subject,
-          text: textContent,
-          html: htmlContent,
+          text,
+          html,
         });
-        return { success: true, mode: "SMTP_DELIVERED" };
+        logger.info("Email dispatched successfully", { to, subject, messageId: info.messageId });
+        return {
+          success: true,
+          mode: process.env.USE_TEST_EMAIL === "true" ? "TEST_DISPATCH" : "SMTP_DELIVERED",
+          messageId: info.messageId,
+        };
       } catch (err) {
-        console.error("⚠️ SMTP dispatch failure:", err.message);
-        return { success: false, error: err.message };
+        logger.error("SMTP dispatch failure", { to, subject, error: err.message });
+        return { success: false, mode: "SMTP_FAILED", error: err.message };
       }
     } else {
-      // In development when SMTP credentials are not configured, simulate delivery safely
-      console.log(`\n📧 [EMAIL DISPATCHED TO ${toEmail}] Subject: "${subject}" (Simulated Dev Mode)`);
-      return { success: true, mode: "DEV_SIMULATION" };
+      // SMTP NOT CONFIGURED: Return truthful failure so Admin & API know the email wasn't delivered!
+      const errorMsg = "SMTP credentials are not configured in backend/.env (missing SMTP_USER / SMTP_PASS). Email could not be sent to " + to;
+      logger.warn(`[SMTP UNCONFIGURED] ${errorMsg}`);
+      console.warn(`\n⚠️  [SMTP UNCONFIGURED] Cannot send email to ${to}.\n   Reason: ${errorMsg}\n   Add SMTP_USER and SMTP_PASS to backend/.env to enable real delivery.\n`);
+      return {
+        success: false,
+        mode: "SMTP_NOT_CONFIGURED",
+        error: errorMsg,
+      };
     }
   }
 
+  // ──────────────────────────────────────────────────────────────────────
+  // 1. BUSINESS DECISION EMAIL (Primary function for Manufacturer & partners)
+  // ──────────────────────────────────────────────────────────────────────
   /**
-   * Send Live 6-Digit Email OTP Verification Code
-   * @param {Object} params
-   * @param {string} params.toEmail
-   * @param {string} params.otp
-   * @param {string} [params.fullName]
+   * Universal business decision email for Manufacturer, Distributor, Pharmacy.
+   * Handles:
+   *   - Object style: sendBusinessDecisionEmail({ toEmail, fullName, role, ... })
+   *   - Positional style: sendBusinessDecisionEmail(appOrUser, "APPROVED", { reason, ... })
    */
-  async sendOtpEmail({ toEmail, otp, fullName = "Valued User" }) {
-    const fromAddress = process.env.SMTP_FROM || '"Fake Drug Detection Security" <verify@drugchain.network>';
-    const subject = `Fake Drug Detection — Your Verification OTP Code: ${otp}`;
+  async sendBusinessDecisionEmail(firstArg, secondArg, thirdArg = {}) {
+    let toEmail, fullName, role, status, organizationName, referenceId, rejectionReason, loginUrl;
 
-    const textContent = `Hello ${fullName},
+    if (firstArg && typeof firstArg === "object" && (!secondArg || typeof secondArg !== "string")) {
+      // Object style argument
+      const opts = firstArg;
+      toEmail          = opts.toEmail || opts.email || opts.contactEmail;
+      fullName         = opts.fullName || opts.name || opts.applicantName;
+      role             = opts.role || "Manufacturer";
+      status           = (opts.status || opts.decision || "APPROVED").toUpperCase();
+      organizationName = opts.organizationName || opts.companyName || opts.company || "";
+      referenceId      = opts.referenceId || opts.applicationId || opts.companyCode || opts.licenseNumber || "";
+      rejectionReason  = opts.rejectionReason || opts.reason || "";
+      loginUrl         = opts.loginUrl;
+    } else {
+      // Positional style argument: (userOrApp, decision, options)
+      const userOrApp = firstArg || {};
+      status          = (secondArg || userOrApp.accountStatus || userOrApp.approvalStatus || userOrApp.status || "APPROVED").toUpperCase();
+      const opts      = thirdArg || {};
+      toEmail          = opts.toEmail || userOrApp.email || userOrApp.contactInformation?.email || userOrApp.contactEmail;
+      fullName         = opts.fullName || userOrApp.fullName || userOrApp.name || userOrApp.applicantName;
+      role             = opts.role || userOrApp.role || "Manufacturer";
+      organizationName = opts.organizationName || userOrApp.companyName || userOrApp.company || userOrApp.pharmacyName || "";
+      referenceId      = opts.referenceId || userOrApp.companyCode || userOrApp.licenseNumber || userOrApp._id?.toString() || "";
+      rejectionReason  = opts.reason || opts.rejectionReason || userOrApp.rejectionReason || "";
+      loginUrl         = opts.loginUrl;
+    }
 
-Your verification OTP code for the Fake Drug Detection platform is:
+    // Safety: Do NOT send approval email for pending applications!
+    if (status === "PENDING") {
+      logger.warn(`Skipping email dispatch for PENDING application (${toEmail})`);
+      return { success: false, mode: "SKIPPED", error: "Cannot send approval email for pending applications" };
+    }
 
-${otp}
+    const frontendUrl   = process.env.FRONTEND_URL || "http://localhost:5173";
+    const resolvedLogin = loginUrl || `${frontendUrl}/login`;
 
-This code is valid for 10 minutes. Please enter it in the registration form to verify your email address.
+    // ── CASE A: APPROVED ────────────────────────────────────────────────
+    if (status === "APPROVED") {
+      // Specific subject format for Manufacturer vs other roles
+      const subject = role === "Manufacturer"
+        ? `${APP_NAME} – Your Manufacturer Registration Has Been Approved`
+        : `${APP_NAME} – Your ${role} Registration Has Been Approved`;
 
-If you did not request this verification code, please disregard this email.
+      const orgBlock = organizationName
+        ? `<p style="margin:0 0 8px;font-size:14px;color:#475569;"><strong>Manufacturer / Company:</strong> ${organizationName}</p>`
+        : "";
+      const refBlock = referenceId
+        ? `<p style="margin:0 0 8px;font-size:14px;color:#475569;"><strong>Reference / License:</strong> ${referenceId}</p>`
+        : "";
 
-Regards,
-Fake Drug Detection Security Team`;
-
-    const htmlContent = `
-    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 540px; margin: 0 auto; background: #ffffff; border: 1px solid #e8eaf6; border-radius: 12px; overflow: hidden; color: #18182e;">
-      <div style="background: linear-gradient(135deg, #5855f3, #4743eb); padding: 22px; text-align: center; color: #ffffff;">
-        <h2 style="margin: 0; font-size: 19px; font-weight: 800; letter-spacing: -0.02em;">Fake Drug Detection Platform</h2>
-        <p style="margin: 4px 0 0; font-size: 12px; opacity: 0.9;">Secure Supply-Chain Email Verification</p>
-      </div>
-      <div style="padding: 28px 24px; text-align: center;">
-        <p style="font-size: 15px; margin-top: 0; color: #18182e;">Hello <strong>${fullName}</strong>,</p>
-        <p style="font-size: 13px; color: #5f607a; line-height: 1.5; margin-bottom: 24px;">
-          Please use the following 6-digit One-Time Password (OTP) to complete your account registration:
+      const html = this._htmlWrapper(`
+        <p style="margin:0 0 16px;font-size:17px;font-weight:700;color:#1E293B;">
+          Dear ${fullName || "Manufacturer Partner"},
         </p>
 
-        <div style="background: #f8f9fd; border: 2px dashed #5855f3; border-radius: 10px; padding: 18px; display: inline-block; margin-bottom: 24px;">
-          <div style="font-size: 32px; font-family: monospace; font-weight: 900; letter-spacing: 8px; color: #5855f3; margin-left: 8px;">
-            ${otp}
+        <div style="background:#ECFDF5;border:1px solid #6EE7B7;border-radius:12px;padding:22px;margin-bottom:24px;text-align:center;">
+          <div style="font-size:32px;margin-bottom:8px;">✅</div>
+          <div style="font-size:19px;font-weight:800;color:#065F46;">Registration Approved</div>
+          <div style="font-size:14px;color:#047857;margin-top:6px;line-height:1.5;">
+            We are pleased to inform you that the <strong>${APP_NAME}</strong> Administration team has reviewed and officially <strong>approved</strong> your registration.
           </div>
         </div>
 
-        <div style="font-size: 12px; color: #8c8ca1; line-height: 1.5;">
-          ⏱️ This code will expire in <strong>10 minutes</strong>.<br />
-          If you did not initiate this request, you can safely ignore this message.
+        <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:20px;margin-bottom:24px;">
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#94A3B8;margin-bottom:12px;">Verified Application Details</div>
+          <p style="margin:0 0 8px;font-size:14px;color:#475569;"><strong>Authorized Role:</strong> ${role}</p>
+          ${orgBlock}
+          ${refBlock}
+          <p style="margin:0;font-size:14px;color:#475569;"><strong>Registered Email:</strong> ${toEmail}</p>
         </div>
 
-        <div style="margin-top: 28px; padding-top: 16px; border-top: 1px solid #f1f3fc; font-size: 11px; color: #a1a1b5;">
-          Secure Pharmaceutical Traceability System &bull; DrugChain Network
+        <div style="margin-bottom:24px;">
+          <div style="font-size:14px;font-weight:700;color:#1E293B;margin-bottom:8px;">🚀 Instructions to Access Your Account</div>
+          <ul style="margin:0;padding-left:20px;font-size:13px;color:#475569;line-height:1.9;">
+            <li>Visit the secure ${APP_NAME} portal at the link below.</li>
+            <li>Sign in using your registered email (<strong>${toEmail}</strong>) and the password created during registration.</li>
+            <li>Begin creating cryptographic drug batches, generating QR codes, and tracking authentic pharmaceutical inventory.</li>
+          </ul>
+        </div>
+
+        <div style="text-align:center;margin:32px 0;">
+          <a href="${resolvedLogin}"
+            style="background:${BRAND_COLOR};color:#ffffff;padding:14px 40px;text-decoration:none;
+                   border-radius:10px;font-weight:700;font-size:15px;display:inline-block;
+                   box-shadow:0 3px 14px rgba(79,70,229,0.35);">
+            Sign In to ${APP_NAME} →
+          </a>
+        </div>
+
+        <div style="border-top:1px solid #E2E8F0;padding-top:20px;margin-top:28px;">
+          <p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#334155;">Warm regards,</p>
+          <p style="margin:0;font-size:13px;color:#64748B;line-height:1.5;">
+            <strong>The ${APP_NAME} Administration Team</strong><br/>
+            Security & Compliance Division<br/>
+            <a href="mailto:${SUPPORT_EMAIL}" style="color:${BRAND_COLOR};text-decoration:none;">${SUPPORT_EMAIL}</a>
+          </p>
+        </div>
+      `);
+
+      const text =
+        `Dear ${fullName || "Manufacturer Partner"},\n\n` +
+        `We are pleased to inform you that your registration on ${APP_NAME} has been APPROVED by the Administration team.\n\n` +
+        `Application Details:\n` +
+        `- Role: ${role}\n` +
+        (organizationName ? `- Organization: ${organizationName}\n` : "") +
+        (referenceId ? `- Reference: ${referenceId}\n` : "") +
+        `- Registered Email: ${toEmail}\n\n` +
+        `Instructions:\n` +
+        `1. Sign in to your account at: ${resolvedLogin}\n` +
+        `2. Use your registered email (${toEmail}) and the password you set during registration.\n` +
+        `3. Start creating drug batches and monitoring supply chain integrity.\n\n` +
+        `Warm regards,\n` +
+        `The ${APP_NAME} Administration Team\n` +
+        `Support: ${SUPPORT_EMAIL}\n`;
+
+      return this._dispatch({ to: toEmail, subject, text, html });
+    }
+
+    // ── CASE B: REJECTED ────────────────────────────────────────────────
+    if (status === "REJECTED") {
+      const subject = `${APP_NAME} – Registration Application Decision`;
+      const reasonText = (rejectionReason && rejectionReason.trim())
+        ? rejectionReason.trim()
+        : "Submitted documentation or organization credentials could not be verified.";
+
+      const html = this._htmlWrapper(`
+        <p style="margin:0 0 16px;font-size:17px;font-weight:700;color:#1E293B;">
+          Dear ${fullName || "Applicant"},
+        </p>
+
+        <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;padding:22px;margin-bottom:24px;text-align:center;">
+          <div style="font-size:32px;margin-bottom:8px;">⚠️</div>
+          <div style="font-size:19px;font-weight:800;color:#991B1B;">Registration Not Approved</div>
+          <div style="font-size:14px;color:#B91C1C;margin-top:6px;line-height:1.5;">
+            Thank you for applying for a <strong>${role}</strong> account on ${APP_NAME}. After review, our administration team was unable to approve your application at this time.
+          </div>
+        </div>
+
+        <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:12px;padding:20px;margin-bottom:24px;">
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#92400E;margin-bottom:8px;">Reason for Decision</div>
+          <p style="margin:0;font-size:14px;color:#78350F;line-height:1.6;">${reasonText}</p>
+        </div>
+
+        <div style="margin-bottom:24px;">
+          <div style="font-size:14px;font-weight:700;color:#1E293B;margin-bottom:8px;">📋 How to Rectify and Re-Apply</div>
+          <ol style="margin:0;padding-left:20px;font-size:13px;color:#475569;line-height:1.9;">
+            <li>Ensure uploaded government ID documents and manufacturing licenses are valid, unexpired, and clearly legible.</li>
+            <li>Confirm that the organization name matches the official registration documents.</li>
+            <li>Submit a new application or contact our compliance desk at <a href="mailto:${SUPPORT_EMAIL}" style="color:${BRAND_COLOR};">${SUPPORT_EMAIL}</a>.</li>
+          </ol>
+        </div>
+
+        <div style="border-top:1px solid #E2E8F0;padding-top:20px;margin-top:28px;">
+          <p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#334155;">Warm regards,</p>
+          <p style="margin:0;font-size:13px;color:#64748B;line-height:1.5;">
+            <strong>The ${APP_NAME} Administration Team</strong><br/>
+            Compliance & Verification Division<br/>
+            <a href="mailto:${SUPPORT_EMAIL}" style="color:${BRAND_COLOR};text-decoration:none;">${SUPPORT_EMAIL}</a>
+          </p>
+        </div>
+      `);
+
+      const text =
+        `Dear ${fullName || "Applicant"},\n\n` +
+        `Your ${role} registration on ${APP_NAME} was reviewed and could not be approved at this time.\n\n` +
+        `Reason for decision:\n${reasonText}\n\n` +
+        `Next Steps:\n` +
+        `Please ensure all submitted documents and business codes are current and legible before submitting a new application.\n\n` +
+        `If you have questions, please reach out to ${SUPPORT_EMAIL}.\n\n` +
+        `Warm regards,\n` +
+        `The ${APP_NAME} Administration Team\n`;
+
+      return this._dispatch({ to: toEmail, subject, text, html });
+    }
+
+    return { success: false, mode: "SKIPPED", error: `Unhandled decision status: ${status}` };
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // 2. EMAIL OTP DISPATCH (Registration, Two-Step Login, Password Reset)
+  // ──────────────────────────────────────────────────────────────────────
+  /**
+   * Dispatches a 6-digit security OTP to the user's email address
+   */
+  async sendOtpEmail({ toEmail, otp, fullName, purpose = "LOGIN", role = "Manufacturer" }) {
+    const isLogin = purpose === "LOGIN";
+    const isPasswordReset = purpose === "PASSWORD_RESET";
+    const actionTitle = isLogin
+      ? "Two-Step Login Verification"
+      : isPasswordReset
+      ? "Password Reset Verification"
+      : `${role} Registration Email Verification`;
+
+    const subject = isLogin
+      ? `${APP_NAME} – Your Two-Step Login Verification Code: ${otp}`
+      : isPasswordReset
+      ? `${APP_NAME} – Your Password Reset Code: ${otp}`
+      : `${APP_NAME} – Verify Your ${role} Registration: ${otp}`;
+
+    const introText = isLogin
+      ? `A login attempt was initiated for your <strong>${role}</strong> portal account. Use the six-digit verification code below to authorize your session:`
+      : isPasswordReset
+      ? `A password reset request was initiated for your account. Use the six-digit code below to set a new password:`
+      : `Thank you for registering your organization as a certified <strong>${role}</strong> on ${APP_NAME}. Please confirm your email address with the verification code below:`;
+
+    const html = this._htmlWrapper(`
+      <p style="margin:0 0 16px;font-size:17px;font-weight:700;color:#1E293B;">
+        Dear ${fullName || "Valued Partner"},
+      </p>
+
+      <p style="margin:0 0 20px;font-size:14px;color:#475569;line-height:1.6;">
+        ${introText}
+      </p>
+
+      <!-- OTP Card -->
+      <div style="background:linear-gradient(135deg,#F0F9FF,#E0F2FE);border:1px solid #BAE6FD;border-radius:16px;padding:28px;text-align:center;margin-bottom:24px;">
+        <div style="font-size:11px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:#0369A1;margin-bottom:10px;">
+          ${actionTitle}
+        </div>
+        <div style="font-size:36px;font-weight:900;letter-spacing:0.25em;color:#0284C7;font-family:monospace;background:#ffffff;display:inline-block;padding:12px 28px;border-radius:12px;border:1px solid #7DD3FC;box-shadow:0 2px 8px rgba(2,132,199,0.1);">
+          ${otp}
+        </div>
+        <div style="font-size:12px;font-weight:600;color:#0C4A6E;margin-top:12px;">
+          ⏱️ Valid for <strong>5 minutes</strong> · Single-use only
         </div>
       </div>
-    </div>`;
 
-    if (this.transporter) {
-      try {
-        await this.transporter.sendMail({
-          from: fromAddress,
-          to: toEmail,
-          subject,
-          text: textContent,
-          html: htmlContent,
-        });
-        return { success: true, mode: "SMTP_DELIVERED" };
-      } catch (err) {
-        console.error("⚠️ SMTP OTP dispatch failure:", err.message);
-        return { success: false, error: err.message };
-      }
-    } else {
-      console.log(`\n🔑 [LIVE EMAIL OTP DISPATCHED] To: ${toEmail} | OTP Code: [ ${otp} ] (Valid 10 mins)`);
-      return { success: true, mode: "DEV_SIMULATION", otp };
-    }
+      <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:12px;padding:16px;margin-bottom:24px;">
+        <div style="font-size:12px;font-weight:800;color:#92400E;margin-bottom:4px;">🛡️ Security Notice</div>
+        <p style="margin:0;font-size:12px;color:#78350F;line-height:1.5;">
+          Never share this code with anyone. MediChainAI administrators will never ask for your verification code. If you did not initiate this request, please contact our security team immediately at <a href="mailto:${SUPPORT_EMAIL}" style="color:${BRAND_COLOR};">${SUPPORT_EMAIL}</a>.
+        </p>
+      </div>
+
+      <div style="border-top:1px solid #E2E8F0;padding-top:20px;margin-top:28px;">
+        <p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#334155;">Warm regards,</p>
+        <p style="margin:0;font-size:13px;color:#64748B;line-height:1.5;">
+          <strong>The ${APP_NAME} Security Team</strong><br/>
+          Identity & Access Management Division<br/>
+          <a href="mailto:${SUPPORT_EMAIL}" style="color:${BRAND_COLOR};text-decoration:none;">${SUPPORT_EMAIL}</a>
+        </p>
+      </div>
+    `);
+
+    const text =
+      `Dear ${fullName || "Valued Partner"},\n\n` +
+      `${introText.replace(/<[^>]*>/g, "")}\n\n` +
+      `Your 6-Digit Verification Code:\n` +
+      `>> ${otp} <<\n\n` +
+      `This code is valid for 5 minutes and can only be used once.\n` +
+      `If you did not initiate this request, please contact ${SUPPORT_EMAIL} immediately.\n\n` +
+      `Warm regards,\n` +
+      `The ${APP_NAME} Security Team\n`;
+
+    return this._dispatch({ to: toEmail, subject, text, html });
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // Backward-compatible aliases
+  // ──────────────────────────────────────────────────────────────────────
+  async sendApprovalNotificationEmail(opts) {
+    return this.sendBusinessDecisionEmail({ ...opts, status: "APPROVED" });
+  }
+
+  async sendRejectionEmail(opts) {
+    return this.sendBusinessDecisionEmail({ ...opts, status: "REJECTED" });
   }
 }
 
 export const emailService = new EmailService();
+export const sendBusinessDecisionEmail = (a, b, c) => emailService.sendBusinessDecisionEmail(a, b, c);
+export default emailService;

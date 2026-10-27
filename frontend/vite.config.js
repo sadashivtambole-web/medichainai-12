@@ -7,5 +7,19 @@ export default defineConfig({
   server: {
     port: 5173,
     open: true,
+    proxy: {
+      // Forward all /api/* requests to the Express backend
+      '/api': {
+        target: 'http://localhost:5050',
+        changeOrigin: true,
+        secure: false,
+      },
+      // Forward /uploads/* (served by Express static)
+      '/uploads': {
+        target: 'http://localhost:5050',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
 })

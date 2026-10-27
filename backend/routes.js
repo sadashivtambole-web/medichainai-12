@@ -5,7 +5,30 @@ import crypto from "crypto";
 import path from "path";
 import fs from "fs";
 import bcrypt from "bcryptjs";
-import { User, Medicine, Transfer, OtpVerification } from "./models.js";
+import {
+  User,
+  ManufacturerProfile,
+  DistributorProfile,
+  PharmacyProfile,
+  CustomerProfile,
+  Medicine,
+  SupplyChainTransaction,
+  Transfer,
+  Verification,
+  AiAnalysis,
+  AiAnalysisLog,
+  BlockchainTransaction,
+  AuditLog,
+  Notification,
+  OtpVerification,
+  SecurityAlert,
+  SupplyChainLink,
+} from "./models.js";
+import {
+  getProfileForUser,
+  createOrUpdateProfile,
+  getSafeUserWithProfile,
+} from "./services/profileService.js";
 import {
   upload,
   uploadRegistrationDocs,
@@ -15,6 +38,7 @@ import {
   requireRole,
   sendSuccess,
   sendError,
+  getJwtSecret,
 } from "./middleware.js";
 import { emailService } from "./services/emailService.js";
 import {
@@ -27,16 +51,192 @@ import {
   validateDrugChain,
   calculateMedicineDataHash,
 } from "./blockchain.js";
+import {
+  loginLimiter,
+  otpSendLimiter,
+  otpVerifyLimiter,
+  aiVerifyLimiter,
+  publicVerifyLimiter,
+  registrationLimiter,
+} from "./middleware/rateLimiter.js";
+import { schemas, validate } from "./validators/index.js";
+import { logger } from "./utils/logger.js";
+import {
+  runFullAuthenticityAudit,
+  generateSecureQRToken,
+  parseAndVerifyQRToken,
+  processAIAndOCR,
+} from "./services/verificationEngine.js";
+import { aiService } from "./services/ai/ai.service.js";
 
 const router = express.Router();
+
+// Single source of truth for JWT secret from middleware
+const EFFECTIVE_JWT_SECRET = getJwtSecret();
+
+/* ═══════════════════════════════════════════════════════════════
+   SECURITY RISK EVALUATION HELPER — produces SecurityAlert records.
+   NEVER reveals detailed findings to the submitting party.
+   Only admins (Creator role) can access /api/security-alerts.
+═══════════════════════════════════════════════════════════════ */
+async function evaluateAndLogSecurityRisk({
+  sourceType,
+  submittedByUser,         // Mongoose User document (may be null for pre-save)
+  submittedByEmail = "",
+  submittedByName = "",
+  submittedByRole = "",
+  relatedResourceType = "",
+  relatedResourceId = "",
+  data = {},               // Raw submission fields to inspect
+}) {
+  const flags = [];
+  let riskScore = 0;
+
+  const email = (submittedByEmail || "").toLowerCase();
+  const companyName = (data.companyName || data.company || "").trim().toLowerCase();
+  const companyCode = (data.companyCode || data.licenseNumber || "").trim().toLowerCase();
+  const medicineName = (data.medicineName || data.name || "").trim().toLowerCase();
+  const manufacturingDate = data.manufacturingDate || "";
+  const expiryDate = data.expiryDate || "";
+  const price = (data.price || "").toString().trim();
+  const batchId = (data.batchId || data.batchNumber || "").trim().toLowerCase();
+
+  // ── Registration-level signals ──────────────────────────────────
+  if (sourceType === "MANUFACTURER_REGISTRATION") {
+    // Suspicious email patterns
+    if (/\+|temp|fake|test\d|noreply|throw/.test(email)) {
+      flags.push("Suspicious email pattern detected in registrant address");
+      riskScore += 20;
+    }
+    // Very short company name (1–2 chars)
+    if (companyName.length > 0 && companyName.length < 3) {
+      flags.push("Company name is unusually short — possible placeholder");
+      riskScore += 15;
+    }
+    // Generic / placeholder company names
+    if (/^(test|company|abc|xyz|sample|dummy|pharma|drug|lab)$/.test(companyName)) {
+      flags.push(`Generic or placeholder company name detected: "${data.companyName || data.company}"`); 
+      riskScore += 25;
+    }
+    // Suspiciously short or sequential license/code
+    if (companyCode.length > 0 && companyCode.length < 4) {
+      flags.push("License/company code is unusually short");
+      riskScore += 15;
+    }
+    if (/^(1234|0000|1111|9999|abcd|test)/.test(companyCode)) {
+      flags.push(`Sequential or placeholder license code: "${data.companyCode || data.licenseNumber}"`);
+      riskScore += 30;
+    }
+  }
+
+  // ── Medicine-level signals ──────────────────────────────────────
+  if (sourceType === "MEDICINE_REGISTRATION") {
+    // Expired before manufacturing
+    if (manufacturingDate && expiryDate) {
+      const mfg = new Date(manufacturingDate);
+      const exp = new Date(expiryDate);
+      const diffDays = (exp - mfg) / 86400000;
+      if (diffDays < 30) {
+        flags.push(`Extremely short medicine validity window: only ${Math.round(diffDays)} days between manufacturing and expiry`);
+        riskScore += 35;
+      }
+    }
+    // Already expired on registration date
+    if (expiryDate && new Date(expiryDate) < new Date()) {
+      flags.push(`Medicine registered with an already-expired date: ${expiryDate}`);
+      riskScore += 50;
+    }
+    // Price anomalies
+    if (price) {
+      const priceNum = parseFloat(price.replace(/[^\d.]/g, ""));
+      if (!isNaN(priceNum) && priceNum <= 0) {
+        flags.push(`Zero or negative medicine price submitted: "${price}"`);
+        riskScore += 20;
+      }
+      if (!isNaN(priceNum) && priceNum > 100000) {
+        flags.push(`Unusually high medicine price: "${price}" — possible data entry error or fraud`);
+        riskScore += 15;
+      }
+    }
+    // Suspicious batch ID patterns
+    if (/^(test|batch|abc|0000|1234|fake|sample)/i.test(batchId)) {
+      flags.push(`Suspicious batch ID pattern: "${data.batchId || data.batchNumber}"`);
+      riskScore += 25;
+    }
+    // Generic medicine names
+    if (/^(medicine|drug|tablet|capsule|pill|test|sample)$/i.test(medicineName)) {
+      flags.push(`Generic placeholder medicine name submitted: "${data.medicineName || data.name}"`);
+      riskScore += 20;
+    }
+    // Manufacturing date in the future (more than 7 days)
+    if (manufacturingDate && new Date(manufacturingDate) > new Date(Date.now() + 7 * 86400000)) {
+      flags.push(`Future manufacturing date submitted: ${manufacturingDate}`);
+      riskScore += 30;
+    }
+  }
+
+  // Only create an alert if at least one flag was raised
+  if (flags.length === 0) return null;
+
+  const severity = riskScore >= 60 ? "CRITICAL" : riskScore >= 40 ? "HIGH" : riskScore >= 20 ? "MEDIUM" : "LOW";
+
+  const titleMap = {
+    MANUFACTURER_REGISTRATION: "Suspicious Manufacturer Registration",
+    MEDICINE_REGISTRATION: "Suspicious Medicine Registration",
+    MEDICINE_RESUBMISSION: "Suspicious Medicine Resubmission",
+  };
+
+  try {
+    const alert = await SecurityAlert.create({
+      sourceType,
+      severity,
+      status: "OPEN",
+      submittedByUserId: submittedByUser?._id || null,
+      submittedByEmail: submittedByUser?.email || submittedByEmail,
+      submittedByName: submittedByUser?.name || submittedByName,
+      submittedByRole: submittedByUser?.role || submittedByRole,
+      relatedResourceType,
+      relatedResourceId,
+      title: titleMap[sourceType] || "Suspicious Submission",
+      description: `${flags.length} risk signal(s) detected during automated validation. Risk score: ${riskScore}/100.`,
+      riskFlags: flags,
+      riskScore,
+    });
+    logger.warn(`[SECURITY ALERT] ${sourceType} | score=${riskScore} | severity=${severity} | by=${submittedByEmail}`, { flags });
+    return alert;
+  } catch (err) {
+    logger.warn("Could not save SecurityAlert", { message: err.message });
+    return null;
+  }
+}
+
 
 /* ══════════════════════════════════════════════════════════════════════
    1. AUTHENTICATION, LIVE EMAIL OTP & REGISTRATION APIS
 ══════════════════════════════════════════════════════════════════════ */
 const VALID_ROLES = ["Manufacturer", "Distributor", "Pharmacy", "Customer"];
 
+/**
+ * Mask an email address for privacy (e.g., "m***r@pharma.com")
+ */
+function maskEmail(email) {
+  if (!email || !email.includes("@")) return email || "";
+  const [local, domain] = email.split("@");
+  if (local.length <= 2) {
+    return `${local[0]}***@${domain}`;
+  }
+  return `${local[0]}${"*".repeat(Math.min(local.length - 2, 4))}${local[local.length - 1]}@${domain}`;
+}
+
+/**
+ * Generate a cryptographically secure 6-digit numeric OTP
+ */
+function generateSecureOtp() {
+  return crypto.randomInt(100000, 1000000).toString();
+}
+
 // 1.0 Live Email OTP Dispatch
-router.post("/auth/send-otp", async (req, res) => {
+router.post("/auth/send-otp", otpSendLimiter, validate(schemas.sendOtp), async (req, res) => {
   try {
     const { email, fullName } = req.body;
     if (!email || !email.trim()) {
@@ -55,19 +255,22 @@ router.post("/auth/send-otp", async (req, res) => {
       return sendError(res, "An account with this email is already registered", "DUPLICATE_EMAIL", 409);
     }
 
-    // Generate secure 6-digit numeric OTP
-    const rawOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    const salt = await bcrypt.genSalt(8);
+    // Generate cryptographically secure 6-digit numeric OTP
+    const rawOtp = generateSecureOtp();
+    const salt = await bcrypt.genSalt(10);
     const otpHash = await bcrypt.hash(rawOtp, salt);
 
-    // Invalidate previous OTPs for this email
-    await OtpVerification.deleteMany({ email: cleanEmail });
+    // Invalidate previous OTPs for this email with purpose REGISTRATION
+    await OtpVerification.deleteMany({ email: cleanEmail, purpose: "REGISTRATION" });
 
-    // Store new OTP record (10 minute expiry)
+    // Store new OTP record (5 minute expiry per security specs)
     const otpDoc = new OtpVerification({
       email: cleanEmail,
       otpHash,
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      purpose: "REGISTRATION",
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+      attempts: 0,
+      lastResentAt: new Date(),
       verified: false,
     });
     await otpDoc.save();
@@ -77,17 +280,24 @@ router.post("/auth/send-otp", async (req, res) => {
       toEmail: cleanEmail,
       otp: rawOtp,
       fullName: fullName || "Valued User",
+      purpose: "REGISTRATION",
     });
+
+    if (!emailRes.success && emailRes.mode !== "JSON_TEST") {
+      await OtpVerification.deleteMany({ email: cleanEmail, purpose: "REGISTRATION" });
+      return sendError(res, `Failed to deliver OTP: ${emailRes.error || "Email delivery failed"}`, "EMAIL_DELIVERY_FAILED", 502);
+    }
 
     return sendSuccess(
       res,
       {
         email: cleanEmail,
-        expiresIn: "10 minutes",
+        maskedEmail: maskEmail(cleanEmail),
+        expiresIn: "5 minutes",
         deliveryMode: emailRes.mode,
         debugOtp: process.env.NODE_ENV !== "production" ? rawOtp : undefined,
       },
-      `Live 6-digit OTP dispatched to ${cleanEmail}.`
+      `Live 6-digit OTP dispatched to ${maskEmail(cleanEmail)}.`
     );
   } catch (err) {
     return sendError(res, err.message, "OTP_SEND_FAILED", 500);
@@ -95,7 +305,7 @@ router.post("/auth/send-otp", async (req, res) => {
 });
 
 // 1.0.1 Live Email OTP Verification
-router.post("/auth/verify-otp", async (req, res) => {
+router.post("/auth/verify-otp", otpVerifyLimiter, validate(schemas.verifyOtp), async (req, res) => {
   try {
     const { email, otp } = req.body;
     if (!email || !otp) {
@@ -133,6 +343,128 @@ router.post("/auth/verify-otp", async (req, res) => {
   }
 });
 
+// 1.0.2 Forgot Password - Dispatch Password Reset OTP
+router.post("/auth/forgot-password", otpSendLimiter, async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email || !email.trim()) {
+      return sendError(res, "Email address is required to reset password", "EMAIL_REQUIRED", 400);
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: cleanEmail });
+    if (!user) {
+      // Security: Don't reveal if account exists, but for ease of use in internal platforms return clean message
+      return sendError(res, "No account found matching this email address", "USER_NOT_FOUND", 404);
+    }
+
+    // Generate secure 6-digit numeric OTP
+    const rawOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    const salt = await bcrypt.genSalt(8);
+    const otpHash = await bcrypt.hash(rawOtp, salt);
+
+    // Invalidate previous OTPs for this email
+    await OtpVerification.deleteMany({ email: cleanEmail });
+
+    // Store new OTP record (10 minute expiry)
+    const otpDoc = new OtpVerification({
+      email: cleanEmail,
+      otpHash,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      verified: false,
+    });
+    await otpDoc.save();
+
+    // Dispatch Email Notification
+    const emailRes = await emailService.sendOtpEmail({
+      toEmail: cleanEmail,
+      otp: rawOtp,
+      fullName: user.name || "Valued User",
+    });
+
+    return sendSuccess(
+      res,
+      {
+        email: cleanEmail,
+        expiresIn: "10 minutes",
+        deliveryMode: emailRes.mode,
+        debugOtp: process.env.NODE_ENV !== "production" ? rawOtp : undefined,
+      },
+      `A 6-digit password reset code has been sent to ${cleanEmail}.`
+    );
+  } catch (err) {
+    return sendError(res, err.message, "FORGOT_PASSWORD_FAILED", 500);
+  }
+});
+
+// 1.0.3 Reset Password With Verified OTP
+router.post("/auth/reset-password", otpVerifyLimiter, async (req, res) => {
+  try {
+    const { email, otp, newPassword, confirmPassword } = req.body;
+    if (!email || !otp || !newPassword) {
+      return sendError(res, "Email, OTP code, and new password are required", "VALIDATION_ERROR", 400);
+    }
+
+    if (newPassword.length < 6) {
+      return sendError(res, "Password must be at least 6 characters long", "WEAK_PASSWORD", 400);
+    }
+
+    if (confirmPassword && newPassword !== confirmPassword) {
+      return sendError(res, "Passwords do not match", "PASSWORD_MISMATCH", 400);
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+    const cleanOtp = otp.toString().trim();
+
+    const record = await OtpVerification.findOne({
+      email: cleanEmail,
+      expiresAt: { $gt: new Date() },
+    }).sort({ createdAt: -1 });
+
+    if (!record) {
+      return sendError(res, "Password reset OTP has expired or does not exist. Please request a new code.", "OTP_EXPIRED", 400);
+    }
+
+    const isMatch = await bcrypt.compare(cleanOtp, record.otpHash);
+    if (!isMatch) {
+      return sendError(res, "Invalid OTP code. Please check and re-enter.", "INVALID_OTP", 400);
+    }
+
+    const user = await User.findOne({ email: cleanEmail });
+    if (!user) {
+      return sendError(res, "User account not found", "USER_NOT_FOUND", 404);
+    }
+
+    user.password = newPassword; // Hashed by User pre-save hook
+    user.mustChangePassword = false;
+    user.passwordChangedAt = new Date();
+    await user.save();
+
+    record.verified = true;
+    record.verifiedAt = new Date();
+    await record.save();
+
+    // Audit Log
+    try {
+      await AuditLog.create({
+        userId: user._id,
+        email: user.email,
+        role: user.role,
+        action: "PASSWORD_RESET_SUCCESS",
+        resource: "User",
+        resourceId: user._id.toString(),
+        ipAddress: req.ip || "127.0.0.1",
+        result: "SUCCESS",
+      });
+    } catch (e) {}
+
+    return sendSuccess(res, { email: cleanEmail }, "Your password has been reset successfully! You can now log in.");
+  } catch (err) {
+    return sendError(res, err.message, "RESET_PASSWORD_FAILED", 500);
+  }
+});
+
+
 // Helper to save base64 live camera capture to protected disk
 function saveBase64IdentityPhoto(base64Data, userEmail) {
   try {
@@ -153,6 +485,7 @@ function saveBase64IdentityPhoto(base64Data, userEmail) {
 // 1.1 Professional User Registration (Uses the password given during registration)
 router.post(
   "/auth/register",
+  registrationLimiter,
   uploadRegistrationDocs.fields([
     { name: "identityPhoto", maxCount: 1 },
     { name: "governmentId", maxCount: 1 },
@@ -253,6 +586,8 @@ router.post(
         // Handle Government ID Document
         if (req.files?.governmentId?.[0]) {
           governmentIdPath = req.files.governmentId[0].filename;
+        } else if (req.body.governmentIdBase64 && req.body.governmentIdBase64.startsWith("data:")) {
+          governmentIdPath = saveBase64IdentityPhoto(req.body.governmentIdBase64, effectiveEmail);
         }
 
         if (!governmentIdPath) {
@@ -260,25 +595,269 @@ router.post(
         }
       }
 
-      // Status rule: Professional roles = PENDING, Customer = APPROVED
-      const initialStatus = formattedRole === "Customer" ? "APPROVED" : "PENDING";
+      // For Customer accounts: Direct registration without identity vetting
+      if (formattedRole === "Customer") {
+        const user = new User({
+          name: effectiveName,
+          fullName: effectiveName,
+          email: effectiveEmail,
+          password, // Hashed by UserSchema pre-save hook
+          role: "Customer",
+          accountStatus: "APPROVED",
+          approvalStatus: "APPROVED",
+          submittedAt: new Date(),
+          mustChangePassword: false,
+          credentialEmailStatus: "PENDING",
+          isEmailVerified: true,
+        });
+        await user.save();
 
-      const user = new User({
-        name: effectiveName,
-        fullName: effectiveName,
+        const profile = await createOrUpdateProfile(user, {
+          companyName: effectiveCompany,
+          phone: (phone || "").trim(),
+          approvalStatus: "APPROVED",
+        });
+
+        try {
+          await AuditLog.create({
+            userId: user._id,
+            email: user.email,
+            role: user.role,
+            action: "USER_REGISTRATION",
+            resource: "User",
+            resourceId: user._id.toString(),
+            ipAddress: req.ip || "127.0.0.1",
+            result: "SUCCESS",
+            details: { role: user.role, accountStatus: "APPROVED" },
+          });
+        } catch (logErr) {}
+
+        const token = jwt.sign(
+          {
+            userId: user._id,
+            id: user._id,
+            email: user.email,
+            role: user.role,
+            company: effectiveCompany,
+            accountStatus: user.accountStatus,
+          },
+          EFFECTIVE_JWT_SECRET,
+          { expiresIn: "7d" }
+        );
+
+        logger.auth("Customer registered", { email: effectiveEmail, role: formattedRole });
+        return sendSuccess(
+          res,
+          {
+            user: user.toSafeObject(profile),
+            token,
+            accountStatus: "APPROVED",
+            message: "Registration successful! You are now logged in.",
+          },
+          "Registration successful",
+          201
+        );
+      }
+
+      // For Professional Roles (Manufacturer, Distributor, Pharmacy):
+      // 1. Check 60-second cooldown on existing OTP for registration
+      const existingOtp = await OtpVerification.findOne({
         email: effectiveEmail,
-        password, // Hashed by UserSchema pre-save hook using the password given in registration
-        phone: (phone || "").trim(),
+        purpose: "REGISTRATION",
+      }).sort({ createdAt: -1 });
+
+      if (existingOtp && existingOtp.lastResentAt) {
+        const elapsed = Math.floor((Date.now() - new Date(existingOtp.lastResentAt).getTime()) / 1000);
+        if (elapsed < 60) {
+          return sendError(
+            res,
+            `A verification code was recently sent. Please wait ${60 - elapsed} seconds before requesting a new code.`,
+            "RESEND_COOLDOWN",
+            429
+          );
+        }
+      }
+
+      // 2. Generate 6-digit cryptographically secure OTP and unique registration ID
+      const rawOtp = generateSecureOtp();
+      const salt = await bcrypt.genSalt(10);
+      const otpHash = await bcrypt.hash(rawOtp, salt);
+      const registrationId = `REG-${Date.now()}-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15-minute persistent window
+
+      // Invalidate existing registration OTPs for this email
+      await OtpVerification.deleteMany({ email: effectiveEmail, purpose: "REGISTRATION" });
+
+      // 3. Store temporary registration payload and hashed OTP in MongoDB (15-minute expiry)
+      await OtpVerification.create({
+        registrationId,
+        email: effectiveEmail,
+        otpHash,
+        purpose: "REGISTRATION",
         role: formattedRole,
-        company: effectiveCompany,
-        companyName: effectiveCompany,
-        companyCode: (companyCode || "").trim(),
-        walletAddress: (walletAddress || "").trim(),
-        identityPhoto: identityPhotoPath,
-        governmentId: governmentIdPath,
-        governmentIdType: governmentIdType || "Government Identity Document",
-        accountStatus: initialStatus,
-        approvalStatus: initialStatus,
+        tempRegistrationData: {
+          effectiveName,
+          effectiveEmail,
+          hashedPassword,
+          password: hashedPassword, // Backward-compat
+          role: formattedRole,
+          effectiveCompany,
+          companyCode: (companyCode || "").trim(),
+          phone: (phone || "").trim(),
+          walletAddress: (walletAddress || "").trim(),
+          identityPhotoPath,
+          governmentIdPath,
+          governmentIdType: governmentIdType || "Government Identity Document",
+        },
+        attempts: 0,
+        lastResentAt: new Date(),
+        expiresAt,
+        verified: false,
+      });
+
+      // 4. Dispatch Email OTP via configured SMTP service
+      const emailRes = await emailService.sendOtpEmail({
+        toEmail: effectiveEmail,
+        otp: rawOtp,
+        fullName: effectiveName,
+        purpose: "REGISTRATION",
+        role: formattedRole,
+      });
+
+      if (!emailRes.success && emailRes.mode !== "JSON_TEST") {
+        await OtpVerification.deleteMany({ email: effectiveEmail, purpose: "REGISTRATION" });
+        return sendError(
+          res,
+          `Failed to deliver verification code to ${effectiveEmail}: ${emailRes.error || "Email service error"}. Please verify your email configuration.`,
+          "EMAIL_DELIVERY_FAILED",
+          502
+        );
+      }
+
+      logger.auth("Registration OTP dispatched", { email: effectiveEmail, role: formattedRole, registrationId });
+
+      return sendSuccess(
+        res,
+        {
+          requiresOtp: true,
+          registrationId,
+          email: effectiveEmail,
+          maskedEmail: maskEmail(effectiveEmail),
+          purpose: "REGISTRATION",
+          role: formattedRole,
+          expiresIn: "15 minutes",
+          debugOtp: process.env.NODE_ENV !== "production" ? rawOtp : undefined,
+        },
+        `A 6-digit verification code has been dispatched to ${maskEmail(effectiveEmail)}. Please verify your email to complete registration.`
+      );
+    } catch (err) {
+      return sendError(res, err.message, "REGISTRATION_FAILED", 500);
+    }
+  }
+);
+
+// 1.1.1 Verify Registration OTP & Activate Pending Creator Review
+router.post(
+  "/auth/verify-registration-otp",
+  otpVerifyLimiter,
+  validate(schemas.verifyRegistrationOtp),
+  async (req, res) => {
+    try {
+      const { email, otp, registrationId } = req.body;
+      const cleanEmail = (email || "").toLowerCase().trim();
+      const cleanOtp = (otp || "").toString().trim();
+      const cleanRegistrationId = (registrationId || "").trim();
+
+      if (!cleanOtp) {
+        return sendError(res, "Verification code is required.", "INVALID_INPUT", 400);
+      }
+      if (!cleanEmail && !cleanRegistrationId) {
+        return sendError(res, "Email or Registration ID is required.", "INVALID_INPUT", 400);
+      }
+
+      // Query by registrationId OR email for maximum reliability across refresh & server restarts
+      const query = {
+        purpose: "REGISTRATION",
+        expiresAt: { $gt: new Date() },
+      };
+      if (cleanRegistrationId && cleanEmail) {
+        query.$or = [{ registrationId: cleanRegistrationId }, { email: cleanEmail }];
+      } else if (cleanRegistrationId) {
+        query.registrationId = cleanRegistrationId;
+      } else {
+        query.email = cleanEmail;
+      }
+
+      const record = await OtpVerification.findOne(query).sort({ createdAt: -1 });
+
+      if (!record || !record.tempRegistrationData) {
+        logger.warn("Registration OTP lookup failed: Session expired or not found", {
+          email: cleanEmail,
+          registrationId: cleanRegistrationId,
+        });
+        return sendError(
+          res,
+          "Registration session has expired or was not found. Please submit your registration details again.",
+          "OTP_EXPIRED",
+          400
+        );
+      }
+
+      if (record.attempts >= 5) {
+        await OtpVerification.deleteOne({ _id: record._id });
+        return sendError(
+          res,
+          "Too many failed verification attempts. Please register again to receive a fresh verification code.",
+          "MAX_ATTEMPTS_EXCEEDED",
+          429
+        );
+      }
+
+      const isMatch = await bcrypt.compare(cleanOtp, record.otpHash);
+      if (!isMatch) {
+        record.attempts = (record.attempts || 0) + 1;
+        await record.save();
+        const remaining = Math.max(0, 5 - record.attempts);
+        return sendError(
+          res,
+          `Invalid verification code. ${remaining} attempt(s) remaining.`,
+          "INVALID_OTP",
+          400
+        );
+      }
+
+      // Check duplicate email again in User collection to prevent race conditions
+      const existingUser = await User.findOne({ email: cleanEmail });
+      if (existingUser) {
+        await OtpVerification.deleteMany({
+          $or: [
+            { email: cleanEmail, purpose: "REGISTRATION" },
+            ...(cleanRegistrationId ? [{ registrationId: cleanRegistrationId }] : []),
+          ],
+        });
+        return sendError(res, "An account with this email is already registered.", "DUPLICATE_EMAIL", 409);
+      }
+
+      const temp = record.tempRegistrationData;
+
+      // Invalidate OTP record immediately upon successful verification
+      await OtpVerification.deleteMany({
+        $or: [
+          { email: cleanEmail, purpose: "REGISTRATION" },
+          ...(cleanRegistrationId ? [{ registrationId: cleanRegistrationId }] : []),
+        ],
+      });
+
+      // 1. Save Authentication Record in Users Collection (using pre-hashed password)
+      const user = new User({
+        name: temp.effectiveName,
+        fullName: temp.effectiveName,
+        email: cleanEmail,
+        password: temp.hashedPassword || temp.password,
+        role: temp.role,
+        accountStatus: "PENDING",
+        approvalStatus: "PENDING",
         submittedAt: new Date(),
         mustChangePassword: false,
         credentialEmailStatus: "PENDING",
@@ -287,37 +866,64 @@ router.post(
 
       await user.save();
 
-      let token = null;
-      if (initialStatus === "APPROVED") {
-        token = jwt.sign(
-          {
-            userId: user._id,
-            email: user.email,
-            role: user.role,
-            company: user.company,
-            accountStatus: user.accountStatus,
-          },
-          process.env.JWT_SECRET || "super_secret_jwt_key_fake_drug_detection_2026",
-          { expiresIn: "7d" }
-        );
-      }
+      // 2. Save Business Profile in Dedicated Role Collection
+      const profile = await createOrUpdateProfile(user, {
+        companyName: temp.effectiveCompany,
+        companyCode: temp.companyCode,
+        licenseNumber: temp.companyCode,
+        phone: temp.phone,
+        walletAddress: temp.walletAddress,
+        identityPhoto: temp.identityPhotoPath,
+        governmentId: temp.governmentIdPath,
+        governmentIdType: temp.governmentIdType,
+        approvalStatus: "PENDING",
+      });
+
+      // 3. Record in Audit Log
+      try {
+        await AuditLog.create({
+          userId: user._id,
+          email: user.email,
+          role: user.role,
+          action: "USER_REGISTRATION",
+          resource: "User",
+          resourceId: user._id.toString(),
+          ipAddress: req.ip || "127.0.0.1",
+          result: "SUCCESS",
+          details: { role: user.role, accountStatus: "PENDING", isEmailVerified: true },
+        });
+      } catch (logErr) {}
+
+      logger.auth("User registration verified via OTP", { email: cleanEmail, role: temp.role });
+
+      // Run silent security risk evaluation asynchronously
+      evaluateAndLogSecurityRisk({
+        sourceType: "MANUFACTURER_REGISTRATION",
+        submittedByUser: user,
+        relatedResourceType: "User",
+        relatedResourceId: user._id.toString(),
+        data: {
+          companyName: temp.effectiveCompany,
+          companyCode: temp.companyCode,
+          licenseNumber: temp.companyCode,
+        },
+      }).catch(() => {});
 
       return sendSuccess(
         res,
         {
-          user: user.toSafeObject(),
-          token,
-          accountStatus: initialStatus,
+          user: user.toSafeObject(profile),
+          accountStatus: "PENDING",
+          isEmailVerified: true,
           message:
-            initialStatus === "PENDING"
-              ? "Your application has been submitted for Creator identity review. You can log in with your registered password once approved."
-              : "Registration successful! You are now logged in.",
+            "Your email has been verified successfully! Your application has been submitted for Creator identity review. You can log in with your registered password once approved.",
         },
-        "Registration successful",
+        "Email verified and registration submitted for Creator review",
         201
       );
     } catch (err) {
-      return sendError(res, err.message, "REGISTRATION_FAILED", 500);
+      logger.error("Verify registration OTP error", { message: err.message });
+      return sendError(res, "Registration verification failed", "REGISTRATION_VERIFY_FAILED", 500);
     }
   }
 );
@@ -387,7 +993,32 @@ router.patch(
       user.rejectionReason = "";
 
       await user.save();
-      return sendSuccess(res, user.toSafeObject(), "Application updated and resubmitted for Creator approval.");
+
+      // Update role profile in separate collection
+      const profile = await createOrUpdateProfile(user, {
+        companyName: companyName ? companyName.trim() : undefined,
+        companyCode: companyCode ? companyCode.trim() : undefined,
+        phone: phone ? phone.trim() : undefined,
+        identityPhoto: user.identityPhoto,
+        governmentId: user.governmentId,
+        approvalStatus: "PENDING",
+      });
+
+      // Audit Log
+      try {
+        await AuditLog.create({
+          userId: user._id,
+          email: user.email,
+          role: user.role,
+          action: "ACCOUNT_RESUBMITTED",
+          resource: "User",
+          resourceId: user._id.toString(),
+          ipAddress: req.ip || "127.0.0.1",
+          result: "SUCCESS",
+        });
+      } catch (logErr) {}
+
+      return sendSuccess(res, user.toSafeObject(profile), "Application updated and resubmitted for Creator approval.");
     } catch (err) {
       return sendError(res, err.message, "RESUBMISSION_FAILED", 500);
     }
@@ -395,20 +1026,44 @@ router.patch(
 );
 
 // 1.3 User Login
-router.post("/auth/login", async (req, res) => {
+router.post("/auth/login", loginLimiter, validate(schemas.login), async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
       return sendError(res, "Email and password are required", "VALIDATION_ERROR", 400);
     }
 
-    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    const cleanEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: cleanEmail });
     if (!user) {
+      try {
+        await AuditLog.create({
+          email: cleanEmail,
+          action: "LOGIN_FAILED",
+          resource: "User",
+          ipAddress: req.ip || "127.0.0.1",
+          result: "FAILED",
+          details: { reason: "User not found" },
+        });
+      } catch (e) {}
       return sendError(res, "Invalid email or password", "AUTH_FAILED", 401);
     }
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
+      try {
+        await AuditLog.create({
+          userId: user._id,
+          email: user.email,
+          role: user.role,
+          action: "LOGIN_FAILED",
+          resource: "User",
+          resourceId: user._id.toString(),
+          ipAddress: req.ip || "127.0.0.1",
+          result: "FAILED",
+          details: { reason: "Password mismatch" },
+        });
+      } catch (e) {}
       return sendError(res, "Invalid email or password", "AUTH_FAILED", 401);
     }
 
@@ -446,25 +1101,422 @@ router.post("/auth/login", async (req, res) => {
       }
     }
 
-    const token = jwt.sign(
-      { id: user._id, role: user.role, email: user.email },
-      process.env.JWT_SECRET || "fake_drug_secret_key_2024",
-      { expiresIn: "7d" }
-    );
+    // Direct login for Creator (system admin) and Customer roles
+    if (isCreator || (user.role || "").toLowerCase() === "customer") {
+      const profile = await getProfileForUser(user);
+      const token = jwt.sign(
+        {
+          id: user._id,
+          userId: user._id,
+          role: user.role,
+          email: user.email,
+          company: profile?.companyName || profile?.pharmacyName || "",
+        },
+        EFFECTIVE_JWT_SECRET,
+        { expiresIn: "7d" }
+      );
+      logger.auth("Direct login successful", { email: user.email, role: user.role });
+
+      try {
+        await AuditLog.create({
+          userId: user._id,
+          email: user.email,
+          role: user.role,
+          action: "LOGIN_SUCCESS",
+          resource: "User",
+          resourceId: user._id.toString(),
+          ipAddress: req.ip || "127.0.0.1",
+          result: "SUCCESS",
+        });
+      } catch (e) {}
+
+      return sendSuccess(
+        res,
+        {
+          user: user.toSafeObject(profile),
+          token,
+          mustChangePassword: !!user.mustChangePassword,
+        },
+        "Login successful"
+      );
+    }
+
+    // ── Two-Step Login with Email OTP for Manufacturer, Distributor, Pharmacy ──
+    const rawOtp = generateSecureOtp();
+    const loginSessionToken = crypto.randomBytes(32).toString("hex");
+    const salt = await bcrypt.genSalt(10);
+    const otpHash = await bcrypt.hash(rawOtp, salt);
+
+    // Invalidate previous LOGIN OTPs for this email
+    await OtpVerification.deleteMany({ email: cleanEmail, purpose: "LOGIN" });
+
+    // Store new OTP record (5 minute expiry per security specs)
+    await OtpVerification.create({
+      email: cleanEmail,
+      otpHash,
+      purpose: "LOGIN",
+      role: user.role,
+      loginAttemptId: loginSessionToken,
+      attempts: 0,
+      lastResentAt: new Date(),
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes
+      verified: false,
+    });
+
+    // Send OTP email
+    const emailRes = await emailService.sendOtpEmail({
+      toEmail: cleanEmail,
+      otp: rawOtp,
+      fullName: user.name || user.fullName || "Partner",
+      purpose: "LOGIN",
+      role: user.role,
+    });
+
+    if (!emailRes.success && emailRes.mode !== "JSON_TEST") {
+      await OtpVerification.deleteMany({ email: cleanEmail, purpose: "LOGIN" });
+      return sendError(
+        res,
+        `Failed to deliver login verification code to your email: ${emailRes.error || "Email provider error"}. Please check your email configuration.`,
+        "EMAIL_DELIVERY_FAILED",
+        502
+      );
+    }
+
+    logger.auth("Login OTP dispatched", { email: cleanEmail, role: user.role });
 
     return sendSuccess(
       res,
       {
-        user: user.toSafeObject(),
-        token,
-        mustChangePassword: !!user.mustChangePassword,
+        requiresOtp: true,
+        email: cleanEmail,
+        maskedEmail: maskEmail(cleanEmail),
+        loginSessionToken,
+        purpose: "LOGIN",
+        role: user.role,
+        expiresIn: "5 minutes",
+        debugOtp: process.env.NODE_ENV !== "production" ? rawOtp : undefined,
       },
-      "Login successful"
+      `A 6-digit verification code has been dispatched to ${maskEmail(cleanEmail)}.`
     );
   } catch (err) {
-    return sendError(res, err.message, "LOGIN_FAILED", 500);
+    logger.error("Login error", { message: err.message });
+    return sendError(res, "Login failed due to server error", "LOGIN_FAILED", 500);
   }
 });
+
+// 1.3.1 Verify Login OTP & Complete Two-Step Authentication
+router.post(
+  "/auth/verify-login-otp",
+  otpVerifyLimiter,
+  validate(schemas.verifyLoginOtp),
+  async (req, res) => {
+    try {
+      const { email, otp, loginSessionToken } = req.body;
+      const cleanEmail = email.toLowerCase().trim();
+      const cleanOtp = otp.toString().trim();
+
+      const query = {
+        email: cleanEmail,
+        purpose: "LOGIN",
+        expiresAt: { $gt: new Date() },
+      };
+      if (loginSessionToken) {
+        query.loginAttemptId = loginSessionToken;
+      }
+
+      const record = await OtpVerification.findOne(query).sort({ createdAt: -1 });
+
+      if (!record) {
+        return sendError(
+          res,
+          "Verification code has expired or is invalid. Please log in again to receive a new code.",
+          "OTP_EXPIRED",
+          400
+        );
+      }
+
+      if (record.attempts >= 5) {
+        await OtpVerification.deleteOne({ _id: record._id });
+        return sendError(
+          res,
+          "Too many failed verification attempts. Please log in again to request a new code.",
+          "MAX_ATTEMPTS_EXCEEDED",
+          429
+        );
+      }
+
+      const isMatch = await bcrypt.compare(cleanOtp, record.otpHash);
+      if (!isMatch) {
+        record.attempts = (record.attempts || 0) + 1;
+        await record.save();
+        const remaining = Math.max(0, 5 - record.attempts);
+        return sendError(
+          res,
+          `Invalid verification code. ${remaining} attempt(s) remaining.`,
+          "INVALID_OTP",
+          400
+        );
+      }
+
+      // Invalidate OTP record immediately upon successful verification
+      await OtpVerification.deleteMany({ email: cleanEmail, purpose: "LOGIN" });
+
+      const user = await User.findOne({ email: cleanEmail });
+      if (!user) {
+        return sendError(res, "Account not found", "USER_NOT_FOUND", 404);
+      }
+
+      // Final status check
+      if (user.accountStatus !== "APPROVED") {
+        return sendError(res, `Your account is currently in ${user.accountStatus} status.`, "ACCOUNT_NOT_APPROVED", 403);
+      }
+
+      // Mark email as verified
+      if (!user.isEmailVerified) {
+        user.isEmailVerified = true;
+        await user.save();
+      }
+
+      const profile = await getProfileForUser(user);
+
+      // Issue final JWT
+      const token = jwt.sign(
+        {
+          id: user._id,
+          userId: user._id,
+          role: user.role,
+          email: user.email,
+          company: profile?.companyName || profile?.pharmacyName || "",
+        },
+        EFFECTIVE_JWT_SECRET,
+        { expiresIn: "7d" }
+      );
+
+      logger.auth("Two-step login verified successfully", { email: user.email, role: user.role });
+
+      try {
+        await AuditLog.create({
+          userId: user._id,
+          email: user.email,
+          role: user.role,
+          action: "LOGIN_SUCCESS",
+          resource: "User",
+          resourceId: user._id.toString(),
+          ipAddress: req.ip || "127.0.0.1",
+          result: "SUCCESS",
+          details: { verifiedVia: "EMAIL_OTP" },
+        });
+      } catch (e) {}
+
+      return sendSuccess(
+        res,
+        {
+          user: user.toSafeObject(profile),
+          token,
+          mustChangePassword: !!user.mustChangePassword,
+        },
+        "Two-step authentication successful! Welcome back."
+      );
+    } catch (err) {
+      logger.error("Verify login OTP error", { message: err.message });
+      return sendError(res, "Verification failed due to server error", "OTP_VERIFY_FAILED", 500);
+    }
+  }
+);
+
+// 1.3.2 Resend OTP (Supports LOGIN, REGISTRATION, and PASSWORD_RESET)
+router.post(
+  "/auth/resend-otp",
+  otpSendLimiter,
+  validate(schemas.resendOtp),
+  async (req, res) => {
+    try {
+      const { email, purpose = "LOGIN", loginSessionToken, registrationId } = req.body;
+      const cleanEmail = email.toLowerCase().trim();
+      const cleanRegId = (registrationId || "").trim();
+
+      // Check 60-second cooldown
+      const existingRecord = await OtpVerification.findOne({
+        $or: [
+          ...(cleanRegId ? [{ registrationId: cleanRegId }] : []),
+          { email: cleanEmail, purpose },
+        ],
+        purpose,
+      }).sort({ createdAt: -1 });
+
+      if (existingRecord && existingRecord.lastResentAt) {
+        const elapsed = Math.floor((Date.now() - new Date(existingRecord.lastResentAt).getTime()) / 1000);
+        if (elapsed < 60) {
+          return sendError(
+            res,
+            `Please wait ${60 - elapsed} seconds before requesting another code.`,
+            "RESEND_COOLDOWN",
+            429
+          );
+        }
+      }
+
+      let recipientName = "Partner";
+      let role = "Manufacturer";
+
+      if (purpose === "LOGIN") {
+        const user = await User.findOne({ email: cleanEmail });
+        if (!user) {
+          return sendError(res, "Account not found.", "USER_NOT_FOUND", 404);
+        }
+        recipientName = user.name || user.fullName || "Partner";
+        role = user.role;
+      } else if (purpose === "REGISTRATION") {
+        if (!existingRecord || !existingRecord.tempRegistrationData) {
+          return sendError(
+            res,
+            "No pending registration session found. Please submit your registration details again.",
+            "SESSION_NOT_FOUND",
+            400
+          );
+        }
+        recipientName = existingRecord.tempRegistrationData.effectiveName || "Partner";
+        role = existingRecord.role || "Manufacturer";
+      }
+
+      const rawOtp = generateSecureOtp();
+      const salt = await bcrypt.genSalt(10);
+      const otpHash = await bcrypt.hash(rawOtp, salt);
+      const newSessionToken = loginSessionToken || crypto.randomBytes(32).toString("hex");
+      const preservedRegId = existingRecord?.registrationId || cleanRegId || null;
+
+      // Invalidate old OTP
+      await OtpVerification.deleteMany({
+        $or: [
+          { email: cleanEmail, purpose },
+          ...(preservedRegId ? [{ registrationId: preservedRegId }] : []),
+        ],
+      });
+
+      // Create new OTP record (15 minute persistent expiry)
+      await OtpVerification.create({
+        registrationId: preservedRegId,
+        email: cleanEmail,
+        otpHash,
+        purpose,
+        role,
+        loginAttemptId: newSessionToken,
+        tempRegistrationData: existingRecord?.tempRegistrationData || null,
+        attempts: 0,
+        lastResentAt: new Date(),
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+        verified: false,
+      });
+
+      const emailRes = await emailService.sendOtpEmail({
+        toEmail: cleanEmail,
+        otp: rawOtp,
+        fullName: recipientName,
+        purpose,
+        role,
+      });
+
+      if (!emailRes.success && emailRes.mode !== "JSON_TEST") {
+        await OtpVerification.deleteMany({ email: cleanEmail, purpose });
+        return sendError(
+          res,
+          `Failed to dispatch verification email: ${emailRes.error || "Email delivery failed"}`,
+          "EMAIL_DELIVERY_FAILED",
+          502
+        );
+      }
+
+      return sendSuccess(
+        res,
+        {
+          registrationId: preservedRegId,
+          email: cleanEmail,
+          maskedEmail: maskEmail(cleanEmail),
+          expiresIn: "15 minutes",
+          debugOtp: process.env.NODE_ENV !== "production" ? rawOtp : undefined,
+        },
+        `A fresh 6-digit verification code has been dispatched to ${maskEmail(cleanEmail)}.`
+      );
+    } catch (err) {
+      logger.error("Resend OTP error", { message: err.message });
+      return sendError(res, err.message, "RESEND_FAILED", 500);
+    }
+  }
+);
+
+// 1.3.3 Send OTP Alias (for backward compatibility)
+router.post(
+  "/auth/send-otp",
+  otpSendLimiter,
+  async (req, res) => {
+    try {
+      const { email, fullName = "Partner" } = req.body;
+      const cleanEmail = (email || "").toLowerCase().trim();
+      if (!cleanEmail) {
+        return sendError(res, "Email address is required.", "INVALID_INPUT", 400);
+      }
+
+      const existingUser = await User.findOne({ email: cleanEmail });
+      if (existingUser) {
+        return sendError(res, "An account with this email is already registered.", "DUPLICATE_EMAIL", 409);
+      }
+
+      // Check 60-second cooldown
+      const existingRecord = await OtpVerification.findOne({
+        email: cleanEmail,
+        purpose: "REGISTRATION",
+      }).sort({ createdAt: -1 });
+
+      if (existingRecord && existingRecord.lastResentAt) {
+        const elapsed = Math.floor((Date.now() - new Date(existingRecord.lastResentAt).getTime()) / 1000);
+        if (elapsed < 60) {
+          return sendError(res, `Please wait ${60 - elapsed} seconds before requesting another code.`, "RESEND_COOLDOWN", 429);
+        }
+      }
+
+      const rawOtp = generateSecureOtp();
+      const salt = await bcrypt.genSalt(10);
+      const otpHash = await bcrypt.hash(rawOtp, salt);
+      const registrationId = `REG-${Date.now()}-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
+
+      await OtpVerification.deleteMany({ email: cleanEmail, purpose: "REGISTRATION" });
+
+      await OtpVerification.create({
+        registrationId,
+        email: cleanEmail,
+        otpHash,
+        purpose: "REGISTRATION",
+        role: "Manufacturer",
+        attempts: 0,
+        lastResentAt: new Date(),
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+        verified: false,
+      });
+
+      await emailService.sendOtpEmail({
+        toEmail: cleanEmail,
+        otp: rawOtp,
+        fullName,
+        purpose: "REGISTRATION",
+      });
+
+      return sendSuccess(
+        res,
+        {
+          requiresOtp: true,
+          registrationId,
+          email: cleanEmail,
+          maskedEmail: maskEmail(cleanEmail),
+          expiresIn: "15 minutes",
+          debugOtp: process.env.NODE_ENV !== "production" ? rawOtp : undefined,
+        },
+        `A 6-digit verification code has been dispatched to ${maskEmail(cleanEmail)}.`
+      );
+    } catch (err) {
+      return sendError(res, err.message, "OTP_SEND_FAILED", 500);
+    }
+  }
+);
 
 // 1.4 First-Login Password Change Endpoint
 router.post("/auth/change-password", verifyToken, async (req, res) => {
@@ -487,9 +1539,25 @@ router.post("/auth/change-password", verifyToken, async (req, res) => {
 
     await user.save();
 
+    const profile = req.userProfile || await getProfileForUser(user);
+
+    // Audit Log
+    try {
+      await AuditLog.create({
+        userId: user._id,
+        email: user.email,
+        role: user.role,
+        action: "PASSWORD_CHANGED",
+        resource: "User",
+        resourceId: user._id.toString(),
+        ipAddress: req.ip || "127.0.0.1",
+        result: "SUCCESS",
+      });
+    } catch (e) {}
+
     return sendSuccess(
       res,
-      { user: user.toSafeObject(), mustChangePassword: false },
+      { user: user.toSafeObject(profile), mustChangePassword: false },
       "Password updated successfully. You can now access your dashboard."
     );
   } catch (err) {
@@ -498,7 +1566,8 @@ router.post("/auth/change-password", verifyToken, async (req, res) => {
 });
 
 router.get("/auth/me", verifyToken, async (req, res) => {
-  return sendSuccess(res, { user: req.user.toSafeObject() }, "Profile retrieved");
+  const profile = req.userProfile || await getProfileForUser(req.user);
+  return sendSuccess(res, { user: req.user.toSafeObject(profile) }, "Profile retrieved");
 });
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -568,7 +1637,13 @@ router.get("/creator/users", verifyToken, requireRole("Creator"), async (req, re
     }
 
     const users = await User.find(query).sort({ createdAt: -1 });
-    return sendSuccess(res, users.map((u) => u.toSafeObject()), "Users retrieved");
+    const usersWithProfiles = await Promise.all(
+      users.map(async (u) => {
+        const profile = await getProfileForUser(u);
+        return u.toSafeObject(profile);
+      })
+    );
+    return sendSuccess(res, usersWithProfiles, "Users retrieved");
   } catch (err) {
     return sendError(res, err.message, "CREATOR_USERS_FAILED", 500);
   }
@@ -578,7 +1653,8 @@ router.get("/creator/users/:userId", verifyToken, requireRole("Creator"), async 
   try {
     const user = await User.findById(req.params.userId);
     if (!user) return sendError(res, "User not found", "NOT_FOUND", 404);
-    return sendSuccess(res, user.toSafeObject(), "User details retrieved");
+    const profile = await getProfileForUser(user);
+    return sendSuccess(res, user.toSafeObject(profile), "User details retrieved");
   } catch (err) {
     return sendError(res, err.message, "USER_FETCH_FAILED", 500);
   }
@@ -587,7 +1663,13 @@ router.get("/creator/users/:userId", verifyToken, requireRole("Creator"), async 
 router.get("/creator/approvals", verifyToken, requireRole("Creator"), async (req, res) => {
   try {
     const pendingUsers = await User.find({ accountStatus: "PENDING" }).sort({ createdAt: -1 });
-    return sendSuccess(res, pendingUsers.map((u) => u.toSafeObject()), "Pending users retrieved");
+    const pendingWithProfiles = await Promise.all(
+      pendingUsers.map(async (u) => {
+        const profile = await getProfileForUser(u);
+        return u.toSafeObject(profile);
+      })
+    );
+    return sendSuccess(res, pendingWithProfiles, "Pending users retrieved");
   } catch (err) {
     return sendError(res, err.message, "APPROVALS_FETCH_FAILED", 500);
   }
@@ -597,13 +1679,16 @@ router.get("/creator/approvals", verifyToken, requireRole("Creator"), async (req
 router.get("/creator/users/:userId/identity-photo", verifyToken, requireRole("Creator"), async (req, res) => {
   try {
     const user = await User.findById(req.params.userId);
-    if (!user || !user.identityPhoto) {
+    if (!user) return sendError(res, "Candidate user not found", "NOT_FOUND", 404);
+    const profile = await getProfileForUser(user);
+    const identityPhoto = profile?.identityPhoto || user.identityPhoto;
+    if (!identityPhoto) {
       return sendError(res, "Identity photo not found for this candidate", "NOT_FOUND", 404);
     }
 
     // A. If stored as Base64 Data URL
-    if (user.identityPhoto.startsWith("data:image/")) {
-      const matches = user.identityPhoto.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    if (identityPhoto.startsWith("data:image/")) {
+      const matches = identityPhoto.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
       if (matches && matches.length === 3) {
         const mimeType = matches[1];
         const buffer = Buffer.from(matches[2], "base64");
@@ -614,12 +1699,12 @@ router.get("/creator/users/:userId/identity-photo", verifyToken, requireRole("Cr
     }
 
     // B. Check disk locations
-    let resolvedPath = path.join(PROTECTED_UPLOADS_DIR, user.identityPhoto);
+    let resolvedPath = path.join(PROTECTED_UPLOADS_DIR, identityPhoto);
     if (!fs.existsSync(resolvedPath)) {
-      resolvedPath = path.join(UPLOADS_DIR, user.identityPhoto);
+      resolvedPath = path.join(UPLOADS_DIR, identityPhoto);
     }
     if (!fs.existsSync(resolvedPath)) {
-      resolvedPath = path.resolve(user.identityPhoto);
+      resolvedPath = path.resolve(identityPhoto);
     }
 
     if (!fs.existsSync(resolvedPath)) {
@@ -646,13 +1731,16 @@ router.get("/creator/users/:userId/identity-photo", verifyToken, requireRole("Cr
 router.get("/creator/users/:userId/government-id", verifyToken, requireRole("Creator"), async (req, res) => {
   try {
     const user = await User.findById(req.params.userId);
-    if (!user || !user.governmentId) {
+    if (!user) return sendError(res, "Candidate user not found", "NOT_FOUND", 404);
+    const profile = await getProfileForUser(user);
+    const governmentId = profile?.governmentId || user.governmentId;
+    if (!governmentId) {
       return sendError(res, "Government ID document not found for this candidate", "NOT_FOUND", 404);
     }
 
     // A. If stored as Base64 Data URL
-    if (user.governmentId.startsWith("data:")) {
-      const matches = user.governmentId.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    if (governmentId.startsWith("data:")) {
+      const matches = governmentId.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
       if (matches && matches.length === 3) {
         const mimeType = matches[1];
         const buffer = Buffer.from(matches[2], "base64");
@@ -663,12 +1751,12 @@ router.get("/creator/users/:userId/government-id", verifyToken, requireRole("Cre
     }
 
     // B. Check disk locations
-    let resolvedPath = path.join(PROTECTED_UPLOADS_DIR, user.governmentId);
+    let resolvedPath = path.join(PROTECTED_UPLOADS_DIR, governmentId);
     if (!fs.existsSync(resolvedPath)) {
-      resolvedPath = path.join(UPLOADS_DIR, user.governmentId);
+      resolvedPath = path.join(UPLOADS_DIR, governmentId);
     }
     if (!fs.existsSync(resolvedPath)) {
-      resolvedPath = path.resolve(user.governmentId);
+      resolvedPath = path.resolve(governmentId);
     }
 
     if (!fs.existsSync(resolvedPath)) {
@@ -696,11 +1784,17 @@ router.get("/creator/users/:userId/government-id", verifyToken, requireRole("Cre
 router.post("/creator/users/:userId/id-ocr", verifyToken, requireRole("Creator"), async (req, res) => {
   try {
     const user = await User.findById(req.params.userId);
-    if (!user || !user.governmentId) {
+    if (!user) return sendError(res, "Candidate user not found", "NOT_FOUND", 404);
+    const profile = await getProfileForUser(user);
+    const governmentId = profile?.governmentId || user.governmentId;
+    if (!governmentId) {
       return sendError(res, "No government ID document found to inspect", "NO_DOC", 404);
     }
 
-    const filePath = path.join(PROTECTED_UPLOADS_DIR, user.governmentId);
+    let filePath = path.join(PROTECTED_UPLOADS_DIR, governmentId);
+    if (!fs.existsSync(filePath)) {
+      filePath = path.join(UPLOADS_DIR, governmentId);
+    }
     if (!fs.existsSync(filePath)) {
       return sendError(res, "Government ID document file missing on disk", "FILE_MISSING", 404);
     }
@@ -780,13 +1874,16 @@ Return ONLY valid JSON matching this structure without markdown backticks:
   }
 });
 
-// 1.7 Creator Approval (Preserves user's registered password)
+// 1.7 Creator Approval (Preserves user's registered password — sends approval notification email)
 router.patch("/creator/users/:userId/approve", verifyToken, requireRole("Creator"), async (req, res) => {
   try {
     const user = await User.findById(req.params.userId);
     if (!user) return sendError(res, "Candidate user not found", "NOT_FOUND", 404);
 
-    // Approve the account - keep the password entered by the user during registration
+    // Guard: prevent double-approval from re-sending emails
+    const wasAlreadyApproved = user.accountStatus === "APPROVED";
+
+    // Approve the account — user keeps the password they registered with
     user.accountStatus = "APPROVED";
     user.approvalStatus = "APPROVED";
     user.approvedBy = req.user.email;
@@ -796,22 +1893,82 @@ router.patch("/creator/users/:userId/approve", verifyToken, requireRole("Creator
     user.rejectionReason = "";
     user.suspendedAt = null;
     user.mustChangePassword = false;
-    user.credentialEmailStatus = "SENT";
+    // Do NOT set credentialEmailStatus = "SENT" here — no credentials email is sent on approval
 
     await user.save();
+
+    // Synchronize approvalStatus in role profile
+    const profile = await createOrUpdateProfile(user, { approvalStatus: "APPROVED" });
+
+    // Audit Log
+    try {
+      await AuditLog.create({
+        userId: req.user._id,
+        email: req.user.email,
+        role: req.user.role,
+        action: "CREATOR_USER_APPROVED",
+        resource: "User",
+        resourceId: user._id.toString(),
+        ipAddress: req.ip || "127.0.0.1",
+        result: "SUCCESS",
+        details: { approvedEmail: user.email, userRole: user.role },
+      });
+    } catch (logErr) {}
+
+    // ── Send Approval Notification Email (only on first approval) ────────
+    let emailResult = { success: false, mode: "SKIPPED", reason: "Already approved" };
+    if (!wasAlreadyApproved) {
+      const organizationName =
+        profile?.companyName || profile?.pharmacyName || user.company || null;
+      const referenceId =
+        profile?.companyCode || profile?.licenseNumber || user.companyCode || user._id.toString();
+      try {
+        emailResult = await emailService.sendBusinessDecisionEmail({
+          toEmail:          user.email,
+          fullName:         user.fullName || user.name,
+          role:             user.role,
+          status:           "APPROVED",
+          organizationName,
+          referenceId,
+        });
+      } catch (emailErr) {
+        emailResult = { success: false, mode: "SMTP_FAILED", error: emailErr.message };
+      }
+
+      // Persist notification status without blocking the approval response
+      try {
+        user.emailNotificationStatus  = emailResult.success ? "SENT" : "FAILED";
+        user.emailNotificationSentAt  = emailResult.success ? new Date() : null;
+        user.emailNotificationError   = emailResult.success ? null : (emailResult.error || "Unknown SMTP error");
+        await user.save();
+      } catch (saveErr) {
+        logger.error("Failed to persist emailNotificationStatus after approval", { error: saveErr.message });
+      }
+    }
 
     return sendSuccess(
       res,
       {
-        user: user.toSafeObject(),
+        user: user.toSafeObject(profile),
         accountStatus: "APPROVED",
+        emailNotification: {
+          status:    emailResult.success ? "SENT" : "FAILED",
+          mode:      emailResult.mode,
+          error:     emailResult.error || null,
+          skipped:   wasAlreadyApproved,
+        },
       },
-      `Account for ${user.name} (${user.role}) has been APPROVED. The user can now log in directly with their registered password.`
+      wasAlreadyApproved
+        ? `Account for ${user.name} (${user.role}) was already approved. No notification email sent.`
+        : emailResult.success
+          ? `Account for ${user.name} (${user.role}) has been APPROVED and a notification email has been sent.`
+          : `Account for ${user.name} (${user.role}) has been APPROVED. ⚠️ Notification email could not be delivered — use Resend Notification to retry.`
     );
   } catch (err) {
     return sendError(res, err.message, "APPROVE_FAILED", 500);
   }
 });
+
 
 // 1.8 Resend Login Credentials
 router.post("/creator/users/:userId/resend-credentials", verifyToken, requireRole("Creator"), async (req, res) => {
@@ -855,12 +2012,92 @@ router.post("/creator/users/:userId/resend-credentials", verifyToken, requireRol
   }
 });
 
-// 1.9 Creator Rejection with Reason
+// 1.8b Resend Approval/Rejection Notification Email (no password change)
+router.post("/creator/users/:userId/resend-notification", verifyToken, requireRole("Creator"), async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId);
+    if (!user) return sendError(res, "User not found", "NOT_FOUND", 404);
+
+    // Only valid for approved or rejected users
+    if (!["APPROVED", "REJECTED"].includes(user.accountStatus)) {
+      return sendError(res, "Notification emails can only be resent for approved or rejected accounts.", "INVALID_STATUS", 400);
+    }
+
+    // Validate email address
+    if (!user.email || !user.email.includes("@")) {
+      return sendError(res, "User does not have a valid email address.", "INVALID_EMAIL", 400);
+    }
+
+    const profile = await getProfileForUser(user).catch(() => null);
+    let emailResult;
+
+    if (user.accountStatus === "APPROVED") {
+      const organizationName = profile?.companyName || profile?.pharmacyName || user.company || null;
+      emailResult = await emailService.sendApprovalNotificationEmail({
+        toEmail:          user.email,
+        fullName:         user.fullName || user.name,
+        role:             user.role,
+        organizationName,
+      });
+    } else {
+      emailResult = await emailService.sendRejectionEmail({
+        toEmail:  user.email,
+        fullName: user.fullName || user.name,
+        role:     user.role,
+        reason:   user.rejectionReason,
+      });
+    }
+
+    // Persist updated notification status
+    user.emailNotificationStatus = emailResult.success ? "SENT" : "FAILED";
+    user.emailNotificationSentAt = emailResult.success ? new Date() : user.emailNotificationSentAt;
+    user.emailNotificationError  = emailResult.success ? null : (emailResult.error || "Unknown SMTP error");
+    await user.save();
+
+    // Audit log
+    try {
+      await AuditLog.create({
+        userId:    req.user._id,
+        email:     req.user.email,
+        role:      req.user.role,
+        action:    "CREATOR_RESEND_NOTIFICATION",
+        resource:  "User",
+        resourceId: user._id.toString(),
+        ipAddress: req.ip || "127.0.0.1",
+        result:    emailResult.success ? "SUCCESS" : "FAILED",
+        details:   { targetEmail: user.email, accountStatus: user.accountStatus, emailMode: emailResult.mode },
+      });
+    } catch (logErr) {}
+
+    if (emailResult.success) {
+      return sendSuccess(
+        res,
+        { emailNotificationStatus: "SENT", mode: emailResult.mode },
+        `Notification email resent successfully to ${user.email}.`
+      );
+    } else {
+      return sendError(
+        res,
+        `Email delivery failed: ${emailResult.error || "SMTP error"}`,
+        "EMAIL_DELIVERY_FAILED",
+        500
+      );
+    }
+  } catch (err) {
+    return sendError(res, err.message, "RESEND_NOTIFICATION_FAILED", 500);
+  }
+});
+
+// 1.9 Creator Rejection with Reason + Rejection Email
+
 router.patch("/creator/users/:userId/reject", verifyToken, requireRole("Creator"), async (req, res) => {
   try {
     const { reason } = req.body;
     const user = await User.findById(req.params.userId);
     if (!user) return sendError(res, "User not found", "NOT_FOUND", 404);
+
+    // Guard: prevent re-sending rejection emails for already-rejected accounts
+    const wasAlreadyRejected = user.accountStatus === "REJECTED";
 
     user.accountStatus = "REJECTED";
     user.approvalStatus = "REJECTED";
@@ -869,22 +2106,103 @@ router.patch("/creator/users/:userId/reject", verifyToken, requireRole("Creator"
     user.rejectionReason = reason || "Submitted identity documents or organization credentials could not be verified.";
 
     await user.save();
-    return sendSuccess(res, user.toSafeObject(), `Application for ${user.name} (${user.role}) has been REJECTED.`);
+
+    // Synchronize approvalStatus in role profile
+    const profile = await createOrUpdateProfile(user, { approvalStatus: "REJECTED" });
+
+    // Audit Log
+    try {
+      await AuditLog.create({
+        userId: req.user._id,
+        email: req.user.email,
+        role: req.user.role,
+        action: "CREATOR_USER_REJECTED",
+        resource: "User",
+        resourceId: user._id.toString(),
+        ipAddress: req.ip || "127.0.0.1",
+        result: "SUCCESS",
+        details: { rejectedEmail: user.email, userRole: user.role, reason: user.rejectionReason },
+      });
+    } catch (logErr) {}
+
+    // ── Send Rejection Notification Email (only on first rejection) ──────
+    let emailResult = { success: false, mode: "SKIPPED", reason: "Already rejected" };
+    if (!wasAlreadyRejected) {
+      try {
+        emailResult = await emailService.sendRejectionEmail({
+          toEmail:  user.email,
+          fullName: user.fullName || user.name,
+          role:     user.role,
+          reason:   user.rejectionReason,
+        });
+      } catch (emailErr) {
+        emailResult = { success: false, mode: "SMTP_FAILED", error: emailErr.message };
+      }
+
+      // Persist notification status
+      try {
+        user.emailNotificationStatus = emailResult.success ? "SENT" : "FAILED";
+        user.emailNotificationSentAt = emailResult.success ? new Date() : null;
+        user.emailNotificationError  = emailResult.success ? null : (emailResult.error || "Unknown SMTP error");
+        await user.save();
+      } catch (saveErr) {
+        logger.error("Failed to persist emailNotificationStatus after rejection", { error: saveErr.message });
+      }
+    }
+
+    return sendSuccess(
+      res,
+      {
+        user: user.toSafeObject(profile),
+        emailNotification: {
+          status:  emailResult.success ? "SENT" : "FAILED",
+          mode:    emailResult.mode,
+          error:   emailResult.error || null,
+          skipped: wasAlreadyRejected,
+        },
+      },
+      wasAlreadyRejected
+        ? `Application for ${user.name} (${user.role}) was already rejected.`
+        : emailResult.success
+          ? `Application for ${user.name} (${user.role}) has been REJECTED and a notification email has been sent.`
+          : `Application for ${user.name} (${user.role}) has been REJECTED. ⚠️ Notification email could not be delivered.`
+    );
   } catch (err) {
     return sendError(res, err.message, "REJECT_FAILED", 500);
   }
 });
 
+
 router.patch("/creator/users/:userId/suspend", verifyToken, requireRole("Creator"), async (req, res) => {
   try {
     const user = await User.findById(req.params.userId);
     if (!user) return sendError(res, "User not found", "NOT_FOUND", 404);
 
     user.accountStatus = "SUSPENDED";
+    user.approvalStatus = "SUSPENDED";
     user.suspendedAt = new Date();
 
     await user.save();
-    return sendSuccess(res, user.toSafeObject(), `Account for ${user.name} (${user.role}) has been SUSPENDED.`);
+
+    // Synchronize approvalStatus in role profile
+    const profile = await createOrUpdateProfile(user, { approvalStatus: "SUSPENDED" });
+
+    // Audit Log
+    try {
+      await AuditLog.create({
+        userId: req.user._id,
+        email: req.user.email,
+        role: req.user.role,
+        action: "CREATOR_USER_SUSPENDED",
+        resource: "User",
+        resourceId: user._id.toString(),
+        ipAddress: req.ip || "127.0.0.1",
+        result: "SUCCESS",
+        details: { suspendedEmail: user.email, userRole: user.role },
+      });
+    } catch (logErr) {}
+
+    return sendSuccess(res, user.toSafeObject(profile), `Account for ${user.name} (${user.role}) has been SUSPENDED.`);
   } catch (err) {
     return sendError(res, err.message, "SUSPEND_FAILED", 500);
   }
@@ -896,10 +2214,30 @@ router.patch("/creator/users/:userId/activate", verifyToken, requireRole("Creato
     if (!user) return sendError(res, "User not found", "NOT_FOUND", 404);
 
     user.accountStatus = "APPROVED";
+    user.approvalStatus = "APPROVED";
     user.suspendedAt = null;
 
     await user.save();
-    return sendSuccess(res, user.toSafeObject(), `Account for ${user.name} (${user.role}) has been ACTIVATED.`);
+
+    // Synchronize approvalStatus in role profile
+    const profile = await createOrUpdateProfile(user, { approvalStatus: "APPROVED" });
+
+    // Audit Log
+    try {
+      await AuditLog.create({
+        userId: req.user._id,
+        email: req.user.email,
+        role: req.user.role,
+        action: "CREATOR_USER_ACTIVATED",
+        resource: "User",
+        resourceId: user._id.toString(),
+        ipAddress: req.ip || "127.0.0.1",
+        result: "SUCCESS",
+        details: { activatedEmail: user.email, userRole: user.role },
+      });
+    } catch (logErr) {}
+
+    return sendSuccess(res, user.toSafeObject(profile), `Account for ${user.name} (${user.role}) has been ACTIVATED.`);
   } catch (err) {
     return sendError(res, err.message, "ACTIVATE_FAILED", 500);
   }
@@ -909,48 +2247,10 @@ router.patch("/creator/users/:userId/activate", verifyToken, requireRole("Creato
 router.get("/creator/blockchain/audit", verifyToken, requireRole("Creator"), async (req, res) => {
   try {
     const auditResult = await validateDrugChain();
+    logger.blockchain("Blockchain audit requested", { by: req.user?.email });
     return sendSuccess(res, auditResult, "Cryptographic audit of DrugChain complete");
   } catch (err) {
-    return sendError(res, err.message, "AUDIT_FAILED", 500);
-  }
-});
-
-router.patch("/creator/users/:userId/suspend", verifyToken, requireRole("Creator"), async (req, res) => {
-  try {
-    const user = await User.findById(req.params.userId);
-    if (!user) return sendError(res, "User not found", "NOT_FOUND", 404);
-
-    user.accountStatus = "SUSPENDED";
-    user.suspendedAt = new Date();
-
-    await user.save();
-    return sendSuccess(res, user.toSafeObject(), `Account for ${user.name} (${user.role}) has been SUSPENDED.`);
-  } catch (err) {
-    return sendError(res, err.message, "SUSPEND_FAILED", 500);
-  }
-});
-
-router.patch("/creator/users/:userId/activate", verifyToken, requireRole("Creator"), async (req, res) => {
-  try {
-    const user = await User.findById(req.params.userId);
-    if (!user) return sendError(res, "User not found", "NOT_FOUND", 404);
-
-    user.accountStatus = "APPROVED";
-    user.suspendedAt = null;
-
-    await user.save();
-    return sendSuccess(res, user.toSafeObject(), `Account for ${user.name} (${user.role}) has been ACTIVATED.`);
-  } catch (err) {
-    return sendError(res, err.message, "ACTIVATE_FAILED", 500);
-  }
-});
-
-// Full Cryptographic Blockchain Audit for Creator
-router.get("/creator/blockchain/audit", verifyToken, requireRole("Creator"), async (req, res) => {
-  try {
-    const auditResult = await validateDrugChain();
-    return sendSuccess(res, auditResult, "Cryptographic audit of DrugChain complete");
-  } catch (err) {
+    logger.error("Blockchain audit failed", { message: err.message });
     return sendError(res, err.message, "AUDIT_FAILED", 500);
   }
 });
@@ -960,133 +2260,114 @@ router.get("/creator/blockchain/audit", verifyToken, requireRole("Creator"), asy
 ══════════════════════════════════════════════════════════════════════ */
 router.post(
   "/verification/ai",
+  aiVerifyLimiter,
   upload.fields([
     { name: "medicineImage", maxCount: 1 },
     { name: "governmentCertificate", maxCount: 1 },
   ]),
   async (req, res) => {
     try {
-      const { medicineName, batchNumber, companyName } = req.body;
-      const geminiApiKey = process.env.GEMINI_API_KEY;
-      const geminiModel = process.env.GEMINI_MODEL || "gemini-flash-latest";
-
-      let ocrExtracted = {
-        medicineName: medicineName || "",
-        batchNumber: batchNumber || "",
-        manufacturer: companyName || "",
-        manufacturingDate: "",
-        expiryDate: "",
-      };
-      let reasons = [];
-      let status = "MATCHED";
-      let confidence = 95;
-      let aiAnalysisDetails = "Deterministic cryptographic verification active";
-
+      const { medicineName, batchNumber, companyName, manufacturingDate, expiryDate } = req.body;
       const imageFile = req.files?.medicineImage?.[0] || req.files?.governmentCertificate?.[0];
-      if (imageFile && geminiApiKey) {
+
+      // Lookup registered medicine if batchNumber is provided
+      let registeredMedicine = null;
+      if (batchNumber && batchNumber.trim()) {
+        registeredMedicine = await Medicine.findOne({
+          batchId: new RegExp(`^${batchNumber.trim()}$`, "i"),
+        });
+      }
+
+      // Execute AI Packaging & Visual OCR Analysis
+      const aiAnalysis = await aiService.analyzeMedicinePackaging({
+        imageFile,
+        formMetadata: { medicineName, batchNumber, companyName, manufacturingDate, expiryDate },
+        registeredMedicine,
+      });
+
+      // Optionally run full authenticity audit if batch or code provided
+      let auditResult = null;
+      const queryCode = batchNumber || medicineName;
+      if (queryCode && queryCode.trim()) {
         try {
-          const fsModule = await import("fs");
-          const imageBuffer = await fsModule.promises.readFile(imageFile.path);
-          const imageBase64 = imageBuffer.toString("base64");
-          const mimeType = imageFile.mimetype || "image/jpeg";
-
-          const promptText = `You are an AI Pharmaceutical Visual Risk Inspector.
-Analyze this uploaded medicine tablet or blister packaging image.
-Form metadata provided by manufacturer:
-- Expected Medicine Name: "${medicineName || "N/A"}"
-- Expected Batch Number: "${batchNumber || "N/A"}"
-- Expected Company: "${companyName || "N/A"}"
-
-Inspect visual tablet appearance, blister foil text, expiry dates, batch stamping, and packaging integrity.
-Return ONLY a valid JSON object matching this structure with no markdown backticks:
-{
-  "medicineName": "extracted medicine name",
-  "batchNumber": "extracted batch number or matching expected",
-  "manufacturer": "extracted company name",
-  "manufacturingDate": "YYYY-MM-DD",
-  "expiryDate": "YYYY-MM-DD",
-  "packagingIntegrity": "INTACT" or "SUSPICIOUS",
-  "status": "MATCHED" or "MISMATCH",
-  "confidence": 95,
-  "reasons": ["short observation bullet points"],
-  "visualInspectionSummary": "concise description of tablet packaging and imprint quality"
-}`;
-
-          const geminiRes = await axios.post(
-            `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`,
-            {
-              contents: [
-                {
-                  parts: [
-                    { text: promptText },
-                    {
-                      inlineData: {
-                        mimeType,
-                        data: imageBase64,
-                      },
-                    },
-                  ],
-                },
-              ],
-            },
-            {
-              headers: { "Content-Type": "application/json" },
-              timeout: 10000,
-            }
-          );
-
-          const rawText = geminiRes.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (rawText) {
-            const cleanJson = rawText.replace(/```json/gi, "").replace(/```/g, "").trim();
-            const parsed = JSON.parse(cleanJson);
-
-            ocrExtracted = {
-              medicineName: parsed.medicineName || ocrExtracted.medicineName,
-              batchNumber: parsed.batchNumber || ocrExtracted.batchNumber,
-              manufacturer: parsed.manufacturer || ocrExtracted.manufacturer,
-              manufacturingDate: parsed.manufacturingDate || ocrExtracted.manufacturingDate,
-              expiryDate: parsed.expiryDate || ocrExtracted.expiryDate,
-            };
-
-            status = parsed.status === "MISMATCH" ? "MISMATCH" : "MATCHED";
-            confidence = parsed.confidence || 95;
-            reasons = parsed.reasons || [];
-            aiAnalysisDetails = parsed.visualInspectionSummary || "Gemini Multimodal Vision Analysis Complete";
-          }
-        } catch (visionErr) {
-          console.warn("Vision inspection fallback notice:", visionErr.message);
+          auditResult = await runFullAuthenticityAudit({
+            queryCode: queryCode.trim(),
+            imageFile,
+            formMetadata: { medicineName, batchNumber, companyName, manufacturingDate, expiryDate },
+            clientIp: req.ip,
+            user: req.user,
+          });
+        } catch (auditErr) {
+          logger.warn("Audit integration note in /verification/ai:", { message: auditErr.message });
         }
       }
 
-      if (batchNumber && (!ocrExtracted.batchNumber || ocrExtracted.batchNumber.toLowerCase() === batchNumber.toLowerCase())) {
-        ocrExtracted.batchNumber = batchNumber;
-        ocrExtracted.medicineName = medicineName || ocrExtracted.medicineName;
-        ocrExtracted.manufacturer = companyName || ocrExtracted.manufacturer;
-        status = "MATCHED";
+      // Persist AI analysis log to MongoDB (STEP 19)
+      try {
+        const logEntry = new AiAnalysisLog({
+          medicineId: registeredMedicine?.id || auditResult?.medicine?.id || "",
+          batchNumber: batchNumber || registeredMedicine?.batchId || "",
+          status: aiAnalysis.status,
+          riskLevel: aiAnalysis.tamperingAnalysis?.riskLevel || "LOW",
+          modelProvider: aiAnalysis.modelProvider || "Gemini Multimodal Vision",
+          extractedData: aiAnalysis.extractedData || {},
+          comparison: aiAnalysis.comparison || {},
+          findings: aiAnalysis.findings || [],
+          warnings: aiAnalysis.warnings || [],
+          confidence: aiAnalysis.confidence,
+          confidenceAvailable: aiAnalysis.confidenceAvailable,
+        });
+        await logEntry.save();
+      } catch (logErr) {
+        logger.warn("Could not save AiAnalysisLog record", { message: logErr.message });
       }
 
       return sendSuccess(
         res,
         {
-          status,
-          confidence,
-          ocrExtracted,
-          reasons,
-          imageVerified: true,
-          riskLevel: status === "MATCHED" ? "LOW" : "HIGH",
-          aiAnalysisDetails,
-          engine: "AI Tablet Visual Risk Assessment & OCR",
+          status: aiAnalysis.status === "PASS" ? "MATCHED" : "MISMATCH",
+          confidence: aiAnalysis.confidence || (aiAnalysis.available ? 92 : 0),
+          confidenceAvailable: aiAnalysis.confidenceAvailable,
+          confidenceSource: aiAnalysis.confidenceSource,
+          ocrExtracted: aiAnalysis.extractedData || {
+            medicineName: medicineName || "",
+            batchNumber: batchNumber || "",
+            manufacturer: companyName || "",
+            manufacturingDate: manufacturingDate || "",
+            expiryDate: expiryDate || "",
+          },
+          reasons: aiAnalysis.findings,
+          warnings: aiAnalysis.warnings,
+          imageVerified: aiAnalysis.available,
+          riskLevel: aiAnalysis.tamperingAnalysis?.riskLevel || "LOW",
+          aiAnalysisDetails: aiAnalysis.findings.join("; "),
+          engine: "AI Tablet Visual Risk Assessment & OCR Engine",
+          ai: {
+            available: aiAnalysis.available,
+            status: aiAnalysis.status,
+            confidence: aiAnalysis.confidence,
+            confidenceAvailable: aiAnalysis.confidenceAvailable,
+          },
+          extractedData: aiAnalysis.extractedData,
+          comparison: aiAnalysis.comparison,
+          tamperingAnalysis: aiAnalysis.tamperingAnalysis,
+          expiryAnalysis: aiAnalysis.expiryAnalysis,
+          trainedModelPresent: false,
+          mlModelNote:
+            "Current system uses AI-assisted image analysis and rule-based risk evaluation; a trained counterfeit classifier can be added later.",
+          audit: auditResult,
         },
         "AI/OCR tablet validation analysis complete"
       );
     } catch (err) {
+      logger.error("AI verification route error", { message: err.message });
       return sendError(res, err.message, "AI_VERIFICATION_ERROR", 500);
     }
   }
 );
 
 /* ══════════════════════════════════════════════════════════════════════
-   3. MEDICINES REGISTRATION & RETRIEVAL (MANUFACTURER)
+   3. MEDICINES REGISTRATION & RETRIEVAL (ROLE ISOLATED)
 ══════════════════════════════════════════════════════════════════════ */
 router.post(
   "/medicines",
@@ -1096,6 +2377,7 @@ router.post(
     { name: "medicineImage", maxCount: 1 },
     { name: "governmentCertificate", maxCount: 1 },
   ]),
+  validate(schemas.registerMedicine),
   async (req, res) => {
     try {
       const {
@@ -1118,16 +2400,103 @@ router.post(
         return sendError(res, "Expiry date must be after manufacturing date", "INVALID_DATES", 400);
       }
 
-      const existing = await Medicine.findOne({ batchId: batchNumber.trim().toUpperCase() });
-      if (existing) {
-        return sendError(res, `Batch ID ${batchNumber} is already registered on-chain`, "DUPLICATE_BATCH", 409);
-      }
-
-      const totalCount = await Medicine.countDocuments();
-      const medicineId = `MED-2024-${String(totalCount + 1).padStart(3, "0")}`;
       const batchId = batchNumber.trim().toUpperCase();
 
-      // Record on DrugChain Blockchain (Strictly real transaction)
+      // ── STEP 1: Check MongoDB for existing record by batchId ────────────
+      const existingInDB = await Medicine.findOne({ batchId });
+      if (existingInDB) {
+        // Batch already registered in DB — return it clearly, don't error
+        const chainHistory = drugChainService.getMedicineHistory(existingInDB.id) || [];
+        return res.status(200).json({
+          success: false,
+          code: "ALREADY_REGISTERED",
+          alreadyRegistered: true,
+          message: `Batch '${batchId}' is already registered. View the existing record below.`,
+          data: {
+            ...existingInDB.toObject(),
+            chainHistory,
+            registrationStatus: "EXISTING_RECORD",
+          },
+        });
+      }
+
+      // ── STEP 2: Check blockchain for orphaned chain record (chain has it, DB doesn't) ──
+      const chainExisting = drugChainService.getRegistrationRecord(null, batchId);
+      if (chainExisting) {
+        // Batch is on-chain but not in DB — this is a DB/chain sync gap.
+        // Sync it to DB from chain data so it's queryable.
+        const syncedId = chainExisting.medicineId || `MED-SYNCED-${batchId}`;
+        const syncedMed = new Medicine({
+          id: syncedId,
+          batchId,
+          name: chainExisting.metadata?.medicineName || medicineName.trim(),
+          medicineName: chainExisting.metadata?.medicineName || medicineName.trim(),
+          manufacturerId: req.user._id,
+          manufacturer: chainExisting.metadata?.manufacturerName || companyName.trim(),
+          manufacturerName: chainExisting.metadata?.manufacturerName || manufacturerName?.trim() || "",
+          company: companyName.trim(),
+          manufacturerCode: chainExisting.metadata?.manufacturerCode || manufacturerCode?.trim() || "",
+          manufacturingDate: chainExisting.metadata?.manufacturingDate || manufacturingDate,
+          expiryDate: chainExisting.metadata?.expiryDate || expiryDate,
+          price: price || "₹120.00",
+          quantity: Number(quantity) || 1000,
+          medicineImage: req.files?.medicineImage?.[0] ? `/uploads/${req.files.medicineImage[0].filename}` : null,
+          currentOwnerId: req.user._id,
+          currentOwnerRole: "Manufacturer",
+          currentHolder: "Manufacturer",
+          status: "AUTHENTIC",
+          medicineDataHash: chainExisting.dataHash,
+          blockchainTxHash: chainExisting.blockHash,
+          blockchainStatus: "Confirmed",
+          transferHistory: [{
+            step: 1,
+            role: "Manufacturer",
+            actor: companyName.trim(),
+            timestamp: new Date(chainExisting.timestamp).toLocaleString("en-IN"),
+            status: "Registered (synced from DrugChain)",
+            txHash: chainExisting.blockHash,
+          }],
+        });
+        try {
+          await syncedMed.save();
+          logger.info("Medicine synced from chain to DB", { batchId, syncedId });
+        } catch (syncErr) {
+          // Unique key race — fetch what was just inserted
+          const raceDoc = await Medicine.findOne({ batchId });
+          if (raceDoc) {
+            return res.status(200).json({
+              success: false,
+              code: "ALREADY_REGISTERED",
+              alreadyRegistered: true,
+              message: `Batch '${batchId}' is already registered. View the existing record below.`,
+              data: { ...raceDoc.toObject(), registrationStatus: "EXISTING_RECORD" },
+            });
+          }
+        }
+        return res.status(200).json({
+          success: false,
+          code: "SYNCED_FROM_CHAIN",
+          alreadyRegistered: true,
+          message: `Batch '${batchId}' was already on DrugChain. Record has been synced to the database.`,
+          data: { ...syncedMed.toObject(), registrationStatus: "SYNCED_FROM_CHAIN", chainRecord: chainExisting },
+        });
+      }
+
+      // ── STEP 3: Generate a collision-safe unique medicine ID ────────────
+      // Use timestamp + random suffix to avoid count-based collisions
+      const year = new Date().getFullYear();
+      const uniqueSuffix = `${Date.now().toString(36).toUpperCase().slice(-5)}${Math.floor(Math.random() * 100).toString().padStart(2, "0")}`;
+      let medicineId = `MED-${year}-${uniqueSuffix}`;
+      // Ensure no DB collision (extremely unlikely but safe)
+      let idExists = await Medicine.findOne({ id: medicineId });
+      let idAttempts = 0;
+      while (idExists && idAttempts < 5) {
+        medicineId = `MED-${year}-${Date.now().toString(36).toUpperCase().slice(-5)}${Math.floor(Math.random() * 99 + 1)}`;
+        idExists = await Medicine.findOne({ id: medicineId });
+        idAttempts++;
+      }
+
+      // ── STEP 4: Record on DrugChain (will return alreadyExists:true if race condition) ──
       const chainRecord = await recordMedicineOnChain(
         {
           id: medicineId,
@@ -1141,6 +2510,29 @@ router.post(
         req.user.role
       );
 
+      // If chain returned alreadyExists (race condition between check and write)
+      if (chainRecord.alreadyExists) {
+        const raceDBRecord = await Medicine.findOne({ batchId });
+        const msg = `Batch '${batchId}' is already registered on DrugChain.`;
+        if (raceDBRecord) {
+          return res.status(200).json({
+            success: false,
+            code: "ALREADY_REGISTERED",
+            alreadyRegistered: true,
+            message: msg,
+            data: { ...raceDBRecord.toObject(), registrationStatus: "EXISTING_RECORD" },
+          });
+        }
+        // DB record missing but chain has it — surface chain info
+        return res.status(200).json({
+          success: false,
+          code: "ALREADY_REGISTERED",
+          alreadyRegistered: true,
+          message: msg,
+          data: { batchId, chainRecord, registrationStatus: "ON_CHAIN_ONLY" },
+        });
+      }
+
       const medicineImage = req.files?.medicineImage?.[0]
         ? `/uploads/${req.files.medicineImage[0].filename}`
         : null;
@@ -1148,10 +2540,13 @@ router.post(
         ? `/uploads/${req.files.governmentCertificate[0].filename}`
         : null;
 
+      // ── STEP 5: Save to MongoDB ─────────────────────────────────────────
       const newMedicine = new Medicine({
         id: medicineId,
         batchId,
         name: medicineName.trim(),
+        medicineName: medicineName.trim(),
+        manufacturerId: req.user._id,
         manufacturer: manufacturerName?.trim() || companyName?.trim(),
         manufacturerName: manufacturerName?.trim() || "",
         company: companyName.trim(),
@@ -1162,6 +2557,9 @@ router.post(
         quantity: Number(quantity) || 1000,
         medicineImage,
         governmentCertificate,
+        currentOwnerId: req.user._id,
+        currentOwnerRole: "Manufacturer",
+        currentHolder: "Manufacturer",
         status: "AUTHENTIC",
         medicineDataHash: chainRecord.dataHash,
         blockchainTxHash: chainRecord.txHash,
@@ -1176,24 +2574,81 @@ router.post(
             txHash: chainRecord.txHash,
           },
         ],
-        currentHolder: "Manufacturer",
       });
 
       await newMedicine.save();
+      logger.medicine("Medicine registered", { id: medicineId, batchId, by: req.user?.email });
 
-      // Create an automatic pending transfer for the Distributor hub
-      const newTransfer = new Transfer({
-        id: `TR-${Date.now().toString().slice(-6)}`,
-        medicineId,
-        medicineName: newMedicine.name,
-        batchId,
-        from: companyName.trim(),
-        to: "ABC Distributors",
-        quantity: `${newMedicine.quantity} Units`,
-        timestamp: new Date().toLocaleString("en-IN"),
-        blockchainStatus: "Pending Confirmation",
+      // Silent security risk evaluation
+      evaluateAndLogSecurityRisk({
+        sourceType: "MEDICINE_REGISTRATION",
+        submittedByUser: req.user,
+        relatedResourceType: "Medicine",
+        relatedResourceId: medicineId,
+        data: { medicineName, batchId, batchNumber, manufacturingDate, expiryDate, price: price || "" },
+      }).catch(() => {});
+
+      // ── STEP 6: Create SupplyChainTransaction for linked distributors ───
+      const mfrDistLinks = await SupplyChainLink.find({
+        linkType: "MANUFACTURER_DISTRIBUTOR",
+        fromUserId: req.user._id,
+        status: "APPROVED",
       });
-      await newTransfer.save();
+      const toDistributors = mfrDistLinks.length > 0 ? mfrDistLinks : [null];
+
+      for (const link of toDistributors) {
+        const transferId = `TR-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
+        const newTransfer = new SupplyChainTransaction({
+          id: transferId,
+          transferId,
+          medicineId,
+          medicineName: newMedicine.name,
+          batchId,
+          fromUserId: req.user._id,
+          fromRole: "Manufacturer",
+          from: companyName.trim(),
+          toRole: "Distributor",
+          toUserId: link ? link.toUserId : null,
+          to: link ? link.toCompanyName : "Pending Assignment",
+          quantity: `${newMedicine.quantity} Units`,
+          timestamp: new Date().toLocaleString("en-IN"),
+          action: "REGISTERED",
+          status: "Pending Confirmation",
+          blockchainStatus: "Pending Confirmation",
+        });
+        await newTransfer.save();
+      }
+
+      // ── STEP 7: Record blockchain transaction in DB collection ──────────
+      try {
+        await BlockchainTransaction.create({
+          medicineId,
+          batchId,
+          transactionType: "MEDICINE_REGISTRATION",
+          blockIndex: chainRecord.blockIndex || 1,
+          transactionHash: chainRecord.txHash,
+          dataHash: chainRecord.dataHash || "",
+          timestamp: new Date(),
+          validationStatus: "VALID",
+        });
+      } catch (bcErr) {
+        logger.warn("Could not save BlockchainTransaction", { message: bcErr.message });
+      }
+
+      // ── STEP 8: Audit log ───────────────────────────────────────────────
+      try {
+        await AuditLog.create({
+          userId: req.user._id,
+          email: req.user.email,
+          role: req.user.role,
+          action: "MEDICINE_REGISTERED",
+          resource: "Medicine",
+          resourceId: medicineId,
+          ipAddress: req.ip || "127.0.0.1",
+          result: "SUCCESS",
+          details: { batchId, medicineName, txHash: chainRecord.txHash, blockIndex: chainRecord.blockIndex },
+        });
+      } catch (auditErr) {}
 
       return sendSuccess(res, newMedicine, "Medicine registered successfully and recorded on DrugChain", 201);
     } catch (err) {
@@ -1202,15 +2657,62 @@ router.post(
   }
 );
 
+// Role-Based Query Isolation for Medicine Retrieval
 router.get("/medicines", verifyToken, requireRole("Manufacturer", "Distributor", "Pharmacy", "Creator"), async (req, res) => {
+
   try {
-    const medicines = await Medicine.find().sort({ createdAt: -1 });
+    const role = (req.user.role || "").toLowerCase();
+    const userProfile = req.userProfile || await getProfileForUser(req.user);
+    const company = (userProfile?.companyName || userProfile?.pharmacyName || req.user.company || req.user.name || "").trim();
+
+    let query = {};
+
+    if (role === "creator") {
+      // Super admin can see all
+      query = {};
+    } else if (role === "manufacturer") {
+      // Manufacturer ONLY sees medicines they created or own
+      query = {
+        $or: [
+          { manufacturerId: req.user._id },
+          { currentOwnerId: req.user._id },
+          { manufacturer: new RegExp(`^${company}$`, "i") },
+          { company: new RegExp(`^${company}$`, "i") },
+        ],
+      };
+    } else if (role === "distributor") {
+      // Distributor ONLY sees medicines in distributor custody or assigned to them
+      query = {
+        $or: [
+          { currentOwnerId: req.user._id },
+          { currentOwnerRole: "Distributor" },
+          { currentHolder: "Distributor" },
+          { "transferHistory.actor": new RegExp(company, "i") },
+        ],
+      };
+    } else if (role === "pharmacy") {
+      // Pharmacy ONLY sees medicines in pharmacy shelf or received/stocked by them
+      query = {
+        $or: [
+          { currentOwnerId: req.user._id },
+          { currentOwnerRole: "Pharmacy" },
+          { currentHolder: "Pharmacy Shelf" },
+          { currentHolder: new RegExp(company, "i") },
+          { "transferHistory.actor": new RegExp(company, "i") },
+        ],
+      };
+    } else {
+      return sendError(res, "Access denied. Only supply-chain partners may inspect internal medicine batches.", "FORBIDDEN", 403);
+    }
+
+    const medicines = await Medicine.find(query).sort({ createdAt: -1 });
     return sendSuccess(res, medicines, "Medicines retrieved");
   } catch (err) {
     return sendError(res, err.message, "FETCH_FAILED", 500);
   }
 });
 
+// Single Medicine Details with Access Isolation
 router.get("/medicines/:id", verifyToken, async (req, res) => {
   try {
     const queryId = req.params.id.trim();
@@ -1222,6 +2724,57 @@ router.get("/medicines/:id", verifyToken, async (req, res) => {
       return sendError(res, "Medicine not found", "NOT_FOUND", 404);
     }
 
+    const role = (req.user.role || "").toLowerCase();
+    const userProfile = req.userProfile || await getProfileForUser(req.user);
+    const company = (userProfile?.companyName || userProfile?.pharmacyName || req.user.company || "").trim();
+
+    // 1. Creator has administrative access
+    if (role === "creator") {
+      return sendSuccess(res, medicine, "Medicine details found");
+    }
+
+    // 2. Customer must use public verification
+    if (role === "customer") {
+      return sendError(res, "Access denied. Customers must use the public verification portal.", "FORBIDDEN", 403);
+    }
+
+    // 3. Manufacturer isolation: Only the manufacturer who owns this batch
+    if (role === "manufacturer") {
+      const isOwner = (medicine.manufacturerId && medicine.manufacturerId.toString() === req.user._id.toString()) ||
+        (company && (medicine.company.toLowerCase() === company.toLowerCase() || medicine.manufacturer.toLowerCase() === company.toLowerCase()));
+      if (!isOwner) {
+        return sendError(res, "Access denied: You are not authorized to view medicines belonging to other manufacturers.", "FORBIDDEN", 403);
+      }
+    }
+
+    // 4. Distributor isolation: Only distributors who handle or have received this batch
+    if (role === "distributor") {
+      const hasCustody = (medicine.currentOwnerId && medicine.currentOwnerId.toString() === req.user._id.toString()) ||
+        medicine.currentHolder === "Distributor" ||
+        (medicine.transferHistory && medicine.transferHistory.some(t => t.actor.toLowerCase().includes(company.toLowerCase())));
+      const hasTransfer = await SupplyChainTransaction.findOne({
+        batchId: medicine.batchId,
+        $or: [{ to: new RegExp(company, "i") }, { toRole: "Distributor" }],
+      });
+      if (!hasCustody && !hasTransfer) {
+        return sendError(res, "Access denied: You are not authorized to inspect this medicine batch.", "FORBIDDEN", 403);
+      }
+    }
+
+    // 5. Pharmacy isolation: Only pharmacy that received or is receiving this batch
+    if (role === "pharmacy") {
+      const isPharmacyCustody = (medicine.currentOwnerId && medicine.currentOwnerId.toString() === req.user._id.toString()) ||
+        medicine.currentHolder.toLowerCase().includes("pharmacy") ||
+        (medicine.transferHistory && medicine.transferHistory.some(t => t.actor.toLowerCase().includes(company.toLowerCase())));
+      const hasTransfer = await SupplyChainTransaction.findOne({
+        batchId: medicine.batchId,
+        $or: [{ to: new RegExp(company, "i") }, { toRole: "Pharmacy" }],
+      });
+      if (!isPharmacyCustody && !hasTransfer) {
+        return sendError(res, "Access denied: This medicine has not been dispatched to your pharmacy.", "FORBIDDEN", 403);
+      }
+    }
+
     return sendSuccess(res, medicine, "Medicine details found");
   } catch (err) {
     return sendError(res, err.message, "QUERY_FAILED", 500);
@@ -1229,11 +2782,58 @@ router.get("/medicines/:id", verifyToken, async (req, res) => {
 });
 
 /* ══════════════════════════════════════════════════════════════════════
-   4. DISTRIBUTOR & PHARMACY TRANSFERS
+   4. DISTRIBUTOR & PHARMACY TRANSFERS (ISOLATED SUPPLY CHAIN)
 ══════════════════════════════════════════════════════════════════════ */
 router.get("/transfers/incoming", verifyToken, requireRole("Distributor", "Pharmacy", "Creator"), async (req, res) => {
   try {
-    const transfers = await Transfer.find().sort({ createdAt: -1 });
+    const role = (req.user.role || "").toLowerCase();
+    const userProfile = req.userProfile || await getProfileForUser(req.user);
+    const company = (userProfile?.companyName || userProfile?.pharmacyName || req.user.company || "").trim();
+
+    let query = {};
+    if (role === "creator") {
+      query = {};
+    } else if (role === "distributor") {
+      // Scope strictly to this distributor — not all distributors
+      const orConditions = [{ toUserId: req.user._id }];
+      if (company) orConditions.push({ to: new RegExp(`^${company}$`, "i") });
+      // Also show REGISTERED batches from manufacturers the distributor is linked to
+      const mfrLinks = await SupplyChainLink.find({
+        linkType: "MANUFACTURER_DISTRIBUTOR",
+        toUserId: req.user._id,
+        status: "APPROVED",
+      }).distinct("fromUserId");
+      if (mfrLinks.length > 0) {
+        orConditions.push({ fromUserId: { $in: mfrLinks }, action: "REGISTERED" });
+      }
+      query = { $or: orConditions };
+    } else if (role === "pharmacy") {
+      // Scope strictly to this pharmacy
+      const orConditions = [{ toUserId: req.user._id }, { toRole: "Pharmacy", action: "FORWARDED" }];
+      if (company) orConditions.push({ to: new RegExp(`^${company}$`, "i") });
+      query = { $or: orConditions };
+    }
+
+
+    const rawTransfers = await SupplyChainTransaction.find(query).sort({ createdAt: -1 });
+
+    // Enrich each transfer with the medicine image from the Medicine collection
+    const batchIds = [...new Set(rawTransfers.map((t) => t.batchId).filter(Boolean))];
+    const medicines = await Medicine.find({ batchId: { $in: batchIds } }, { batchId: 1, medicineImage: 1, manufacturingDate: 1, expiryDate: 1 });
+    const medicineMap = Object.fromEntries(medicines.map((m) => [m.batchId, m]));
+
+    const transfers = rawTransfers.map((t) => {
+      const med = medicineMap[t.batchId];
+      if (!med) return t;
+      const plain = t.toObject ? t.toObject() : { ...t };
+      return {
+        ...plain,
+        medicineImage: med.medicineImage || null,
+        manufacturingDate: plain.manufacturingDate || med.manufacturingDate || null,
+        expiryDate: plain.expiryDate || med.expiryDate || null,
+      };
+    });
+
     return sendSuccess(res, transfers, "Incoming transfers retrieved");
   } catch (err) {
     return sendError(res, err.message, "TRANSFERS_FETCH_FAILED", 500);
@@ -1243,20 +2843,31 @@ router.get("/transfers/incoming", verifyToken, requireRole("Distributor", "Pharm
 router.post("/transfers/:id/confirm", verifyToken, requireRole("Distributor", "Creator"), async (req, res) => {
   try {
     const transferId = req.params.id;
-    const transfer = await Transfer.findOne({ id: transferId });
+    logger.transfer("Transfer confirm requested", { transferId, by: req.user?.email });
+    const transfer = await SupplyChainTransaction.findOne({
+      $or: [{ id: transferId }, { transferId }],
+    });
     if (!transfer) {
       return sendError(res, "Transfer not found", "NOT_FOUND", 404);
     }
 
-    const actor = req.user.company || "ABC Distributors";
-    const chainRecord = await recordTransferOnChain(transferId, transfer.from, actor, "Distributor", transfer.medicineId, transfer.batchId);
+    const userProfile = req.userProfile || await getProfileForUser(req.user);
+    const actor = userProfile?.companyName || req.user.company || "ABC Distributors";
+
+    const chainRecord = await recordTransferOnChain(transfer.id, transfer.from, actor, "Distributor", transfer.medicineId, transfer.batchId);
     const ts = new Date().toLocaleString("en-IN");
 
+    // Update SupplyChainTransaction
+    transfer.toUserId = req.user._id;
+    transfer.to = actor;
+    transfer.action = "CONFIRMED";
+    transfer.status = "Confirmed";
     transfer.blockchainStatus = "Confirmed";
     transfer.confirmTxHash = chainRecord.txHash;
     transfer.confirmedAt = ts;
     await transfer.save();
 
+    // Update Medicine ownership & custody
     await Medicine.findOneAndUpdate(
       { batchId: transfer.batchId },
       {
@@ -1270,9 +2881,41 @@ router.post("/transfers/:id/confirm", verifyToken, requireRole("Distributor", "C
             txHash: chainRecord.txHash,
           },
         },
-        $set: { currentHolder: "Distributor" },
+        $set: {
+          currentOwnerId: req.user._id,
+          currentOwnerRole: "Distributor",
+          currentHolder: "Distributor",
+        },
       }
     );
+
+    // Record BlockchainTransaction
+    try {
+      await BlockchainTransaction.create({
+        medicineId: transfer.medicineId,
+        batchId: transfer.batchId,
+        transactionType: "CUSTODY_TRANSFER",
+        blockIndex: chainRecord.blockIndex || 1,
+        transactionHash: chainRecord.txHash,
+        timestamp: new Date(),
+        validationStatus: "VALID",
+      });
+    } catch (bcErr) {}
+
+    // Record AuditLog
+    try {
+      await AuditLog.create({
+        userId: req.user._id,
+        email: req.user.email,
+        role: req.user.role,
+        action: "TRANSFER_CONFIRMED",
+        resource: "SupplyChainTransaction",
+        resourceId: transfer.id,
+        ipAddress: req.ip || "127.0.0.1",
+        result: "SUCCESS",
+        details: { batchId: transfer.batchId, actor, txHash: chainRecord.txHash },
+      });
+    } catch (auditErr) {}
 
     return sendSuccess(res, transfer, "Transfer confirmed and recorded on DrugChain");
   } catch (err) {
@@ -1283,22 +2926,76 @@ router.post("/transfers/:id/confirm", verifyToken, requireRole("Distributor", "C
 router.post("/transfers/:id/forward", verifyToken, requireRole("Distributor", "Creator"), async (req, res) => {
   try {
     const transferId = req.params.id;
-    const transfer = await Transfer.findOne({ id: transferId });
+    const transfer = await SupplyChainTransaction.findOne({
+      $or: [{ id: transferId }, { transferId }],
+    });
     if (!transfer) {
       return sendError(res, "Transfer not found", "NOT_FOUND", 404);
     }
 
-    const fromActor = req.user.company || "ABC Distributors";
-    const toActor = req.body.destinationPharmacy || "City Pharmacy";
+    const userProfile = req.userProfile || await getProfileForUser(req.user);
+    const fromActor = (userProfile?.companyName || req.user.company || "").trim() || "Distributor";
 
-    const chainRecord = await recordTransferOnChain(transferId, fromActor, toActor, "Pharmacy", transfer.medicineId, transfer.batchId);
+    // Resolve destination pharmacy: use provided pharmacyUserId or pharmacyName, else use linked pharmacy
+    let toActor = (req.body.destinationPharmacy || "").trim();
+    let toPharmacyUserId = req.body.pharmacyUserId || null;
+
+    if (!toActor && toPharmacyUserId) {
+      const pharmUser = await User.findById(toPharmacyUserId);
+      const pharmProfile = pharmUser ? await getProfileForUser(pharmUser) : null;
+      toActor = pharmProfile?.pharmacyName || pharmProfile?.companyName || pharmUser?.name || "Pharmacy";
+    }
+
+    if (!toActor) {
+      // Fall back to first approved linked pharmacy
+      const pharmLink = await SupplyChainLink.findOne({
+        linkType: "DISTRIBUTOR_PHARMACY",
+        fromUserId: req.user._id,
+        status: "APPROVED",
+      });
+      if (pharmLink) {
+        toActor = pharmLink.toCompanyName;
+        toPharmacyUserId = pharmLink.toUserId;
+      } else {
+        toActor = "Unassigned Pharmacy";
+      }
+    }
+
+    const chainRecord = await recordTransferOnChain(transfer.id, fromActor, toActor, "Pharmacy", transfer.medicineId, transfer.batchId);
     const ts = new Date().toLocaleString("en-IN");
 
+    // Update SupplyChainTransaction
+    transfer.action = "FORWARDED";
+    transfer.status = "Forwarded to Pharmacy";
     transfer.blockchainStatus = "Forwarded to Pharmacy";
     transfer.forwardTxHash = chainRecord.txHash;
     transfer.forwardedAt = ts;
     await transfer.save();
 
+    // Create a new SupplyChainTransaction for the Pharmacy leg
+    const pharmacyTransferId = `TR-${Date.now().toString().slice(-6)}`;
+    await SupplyChainTransaction.create({
+      id: pharmacyTransferId,
+      transferId: pharmacyTransferId,
+      medicineId: transfer.medicineId,
+      medicineName: transfer.medicineName,
+      batchId: transfer.batchId,
+      fromUserId: req.user._id,
+      fromRole: "Distributor",
+      from: fromActor,
+      toRole: "Pharmacy",
+      toUserId: toPharmacyUserId || null,
+      to: toActor,
+      quantity: transfer.quantity,
+      timestamp: ts,
+      action: "FORWARDED",
+      status: "Forwarded to Pharmacy",
+      blockchainStatus: "Forwarded to Pharmacy",
+      forwardTxHash: chainRecord.txHash,
+      forwardedAt: ts,
+    });
+
+    // Update Medicine custody
     await Medicine.findOneAndUpdate(
       { batchId: transfer.batchId },
       {
@@ -1312,9 +3009,40 @@ router.post("/transfers/:id/forward", verifyToken, requireRole("Distributor", "C
             txHash: chainRecord.txHash,
           },
         },
-        $set: { currentHolder: `Transit (${toActor})` },
+        $set: {
+          currentHolder: `Transit (${toActor})`,
+          currentOwnerRole: "Pharmacy",
+        },
       }
     );
+
+    // Record BlockchainTransaction
+    try {
+      await BlockchainTransaction.create({
+        medicineId: transfer.medicineId,
+        batchId: transfer.batchId,
+        transactionType: "CUSTODY_TRANSFER",
+        blockIndex: chainRecord.blockIndex || 1,
+        transactionHash: chainRecord.txHash,
+        timestamp: new Date(),
+        validationStatus: "VALID",
+      });
+    } catch (bcErr) {}
+
+    // Record AuditLog
+    try {
+      await AuditLog.create({
+        userId: req.user._id,
+        email: req.user.email,
+        role: req.user.role,
+        action: "TRANSFER_FORWARDED",
+        resource: "SupplyChainTransaction",
+        resourceId: transfer.id,
+        ipAddress: req.ip || "127.0.0.1",
+        result: "SUCCESS",
+        details: { batchId: transfer.batchId, fromActor, toActor, txHash: chainRecord.txHash },
+      });
+    } catch (auditErr) {}
 
     return sendSuccess(res, transfer, "Batch forwarded to pharmacy on DrugChain");
   } catch (err) {
@@ -1333,7 +3061,8 @@ router.post("/pharmacy/:medicineId/confirm", verifyToken, requireRole("Pharmacy"
       return sendError(res, "Medicine not found", "NOT_FOUND", 404);
     }
 
-    const pharmacyActor = req.user.company || "City Pharmacy (POS)";
+    const userProfile = req.userProfile || await getProfileForUser(req.user);
+    const pharmacyActor = userProfile?.pharmacyName || userProfile?.companyName || req.user.company || "City Pharmacy (POS)";
     const ts = new Date().toLocaleString("en-IN");
     const chainRecord = await recordReceiptOnChain(medicine.id, medicine.batchId, pharmacyActor, "Pharmacy");
 
@@ -1345,8 +3074,52 @@ router.post("/pharmacy/:medicineId/confirm", verifyToken, requireRole("Pharmacy"
       status: "Verified & Stocked",
       txHash: chainRecord.txHash,
     });
+    medicine.currentOwnerId = req.user._id;
+    medicine.currentOwnerRole = "Pharmacy";
     medicine.currentHolder = "Pharmacy Shelf";
     await medicine.save();
+
+    // Update SupplyChainTransaction for this batch
+    await SupplyChainTransaction.updateMany(
+      { batchId: medicine.batchId, toRole: "Pharmacy" },
+      {
+        $set: {
+          toUserId: req.user._id,
+          to: pharmacyActor,
+          action: "RECEIVED",
+          status: "Stocked",
+          blockchainStatus: "Received",
+        },
+      }
+    );
+
+    // Record BlockchainTransaction
+    try {
+      await BlockchainTransaction.create({
+        medicineId: medicine.id,
+        batchId: medicine.batchId,
+        transactionType: "RECEIPT_CONFIRMATION",
+        blockIndex: chainRecord.blockIndex || 1,
+        transactionHash: chainRecord.txHash,
+        timestamp: new Date(),
+        validationStatus: "VALID",
+      });
+    } catch (bcErr) {}
+
+    // Record AuditLog
+    try {
+      await AuditLog.create({
+        userId: req.user._id,
+        email: req.user.email,
+        role: req.user.role,
+        action: "PHARMACY_STOCK_CONFIRMED",
+        resource: "Medicine",
+        resourceId: medicine.id,
+        ipAddress: req.ip || "127.0.0.1",
+        result: "SUCCESS",
+        details: { batchId: medicine.batchId, pharmacyActor, txHash: chainRecord.txHash },
+      });
+    } catch (auditErr) {}
 
     return sendSuccess(res, medicine, "Pharmacy shelf receipt confirmed on DrugChain");
   } catch (err) {
@@ -1383,180 +3156,37 @@ function evaluateSupplyChainAnomalies(medicine) {
   };
 }
 
-router.get("/public/verify/:code", async (req, res) => {
+router.get("/public/verify/:code", publicVerifyLimiter, async (req, res) => {
   try {
     const code = decodeURIComponent(req.params.code).trim();
-    let lookup = code;
-
-    try {
-      const parsed = JSON.parse(code);
-      lookup = parsed.medicineId || parsed.batchId || code;
-    } catch {}
-
-    const medicine = await Medicine.findOne({
-      $or: [
-        { id: new RegExp(`^${lookup}$`, "i") },
-        { batchId: new RegExp(`^${lookup}$`, "i") },
-        { name: new RegExp(lookup, "i") },
-      ],
+    const auditResult = await runFullAuthenticityAudit({
+      queryCode: code,
+      clientIp: req.ip,
+      user: req.user,
     });
-
-    if (!medicine) {
-      return sendSuccess(
-        res,
-        {
-          status: "FAKE_OR_UNREGISTERED",
-          isFake: true,
-          authenticityScore: 0,
-          confidence: 99,
-          searchedCode: lookup,
-          layers: {
-            qr: "INVALID_SIGNATURE",
-            database: "NOT_FOUND_UNREGISTERED",
-            integrity: "FAILED_NO_CRYPTOGRAPHIC_PROOF",
-            blockchain: "UNVERIFIED_NOT_ON_CHAIN",
-            expiry: "UNKNOWN_UNREGISTERED_BATCH",
-            supplyChain: "UNAUTHORIZED_NO_CUSTODY_RECORD",
-            qrReuseRisk: "HIGH_RISK_SUSPECTED_COUNTERFEIT",
-          },
-          reasons: [
-            "🚨 CRITICAL SECURITY ALERT: No registered pharmaceutical batch or blockchain record exists matching this code on DrugChain.",
-            "❌ Cryptographic Signature Missing: This medicine was never created or verified by an approved manufacturer.",
-            "❌ No Verified Supply-Chain Custody: Zero authorized distributor transit or pharmacy dispensing logs found.",
-            "⚠️ Counterfeit Drug Warning: This item is suspected to be counterfeit, fake packaging, or an unauthorized copy.",
-          ],
-          medicine: null,
-        },
-        "Real-time counterfeit drug detection check completed"
-      );
-    }
-
-    // 1. Medicine Integrity Check (Canonical SHA-256 vs DrugChain)
-    const canonicalHash = calculateMedicineDataHash({
-      medicineId: medicine.id,
-      batchNumber: medicine.batchId,
-      medicineName: medicine.name,
-      manufacturerCode: medicine.manufacturerCode || "",
-      manufacturingDate: medicine.manufacturingDate,
-      expiryDate: medicine.expiryDate,
-    });
-
-    let chainAuditMatch = true;
-    let chainError = null;
-    let timeline = [];
-
-    try {
-      const onChainData = await verifyMedicineOnChain({
-        medicineId: medicine.id,
-        batchNumber: medicine.batchId,
-        medicineName: medicine.name,
-        manufacturerCode: medicine.manufacturerCode || "",
-        manufacturingDate: medicine.manufacturingDate,
-        expiryDate: medicine.expiryDate,
-      });
-      chainAuditMatch = onChainData.isMatch;
-      timeline = onChainData.timeline || [];
-    } catch (bcErr) {
-      chainAuditMatch = false;
-      chainError = bcErr.message;
-    }
-
-    // 2. Supply-Chain Anomaly Detector
-    const anomalyResult = evaluateSupplyChainAnomalies(medicine);
-
-    // 3. QR Reuse / Cloning Risk Detector
-    medicine.verificationCount = (medicine.verificationCount || 0) + 1;
-    medicine.verificationLogs = medicine.verificationLogs || [];
-    medicine.verificationLogs.push({
-      timestamp: new Date(),
-      role: "Public / Customer",
-      result: chainAuditMatch && !anomalyResult.anomalyDetected ? "AUTHENTIC" : "SUSPICIOUS",
-      clientIp: req.ip || "127.0.0.1",
-    });
-
-    let qrReuseRisk = "LOW";
-    if (medicine.verificationCount > 10) {
-      qrReuseRisk = "HIGH";
-    } else if (medicine.verificationCount > 5) {
-      qrReuseRisk = "MEDIUM";
-    }
-    medicine.qrReuseRisk = qrReuseRisk;
-    await medicine.save();
-
-    // 4. Detailed Explainable Reasons
-    const reasons = [];
-    if (chainAuditMatch) {
-      reasons.push("QR code matched registered pharmaceutical batch on DrugChain.");
-      reasons.push(`Canonical SHA-256 data hash verified on-chain (${canonicalHash.slice(0, 18)}...).`);
-    } else {
-      reasons.push("Data Integrity Mismatch: Submitted parameters do not match immutable DrugChain record.");
-    }
-
-    if (anomalyResult.anomalyDetected) {
-      anomalyResult.flags.forEach((f) => reasons.push(f));
-    } else {
-      reasons.push("Supply-chain custody transfer sequence is authentic and verified.");
-    }
-
-    if (qrReuseRisk === "HIGH") {
-      reasons.push("QR Reuse Risk: High verification frequency detected on this batch code (possible cloning indicator).");
-    }
-
-    const isExpired = new Date(medicine.expiryDate) < new Date();
-    const finalStatus =
-      chainAuditMatch && !anomalyResult.anomalyDetected && !isExpired
-        ? "AUTHENTIC"
-        : "SUSPICIOUS";
-
-    const authenticityScore =
-      finalStatus === "AUTHENTIC"
-        ? qrReuseRisk === "MEDIUM"
-          ? 88
-          : 96
-        : 40;
-
-    return sendSuccess(
-      res,
-      {
-        status: finalStatus,
-        confidence: finalStatus === "AUTHENTIC" ? 96 : 40,
-        authenticityScore,
-        layers: {
-          qr: "VERIFIED",
-          database: "MATCHED",
-          integrity: chainAuditMatch ? "INTEGRITY_VERIFIED" : "DATA_INTEGRITY_MISMATCH",
-          blockchain: chainAuditMatch ? "VERIFIED" : "MISMATCH",
-          expiry: isExpired ? "EXPIRED" : "VALID",
-          supplyChain: anomalyResult.summary,
-          qrReuseRisk,
-        },
-        reasons,
-        timeline: timeline.length > 0 ? timeline : medicine.transferHistory,
-        medicine: {
-          id: medicine.id,
-          batchId: medicine.batchId,
-          name: medicine.name,
-          company: medicine.company,
-          manufacturer: medicine.manufacturer,
-          manufacturerCode: medicine.manufacturerCode,
-          manufacturingDate: medicine.manufacturingDate,
-          expiryDate: medicine.expiryDate,
-          price: medicine.price,
-          quantity: medicine.quantity,
-          medicineImage: medicine.medicineImage,
-          governmentCertificate: medicine.governmentCertificate,
-          blockchainTxHash: medicine.blockchainTxHash,
-          blockchainStatus: medicine.blockchainStatus,
-          currentHolder: medicine.currentHolder,
-          verificationCount: medicine.verificationCount,
-          qrReuseRisk: medicine.qrReuseRisk,
-          transferHistory: medicine.transferHistory,
-        },
-      },
-      "Medicine authenticity verification completed"
-    );
+    return sendSuccess(res, auditResult, "Medicine authenticity verification completed");
   } catch (err) {
-    return sendError(res, err.message, "VERIFICATION_ENGINE_FAILED", 500);
+    logger.error("Verification engine error", { message: err.message });
+    return sendError(res, "Verification failed due to server error", "VERIFICATION_ENGINE_FAILED", 500);
+  }
+});
+
+router.post("/qr/verify", publicVerifyLimiter, async (req, res) => {
+  try {
+    const { code, token, medicineId, batchId } = req.body;
+    const targetCode = token || code || batchId || medicineId;
+    if (!targetCode) {
+      return sendError(res, "Verification code or token is required", "MISSING_CODE", 400);
+    }
+    const auditResult = await runFullAuthenticityAudit({
+      queryCode: String(targetCode).trim(),
+      clientIp: req.ip,
+      user: req.user,
+    });
+    return sendSuccess(res, auditResult, "QR authenticity verification completed");
+  } catch (err) {
+    logger.error("QR verification error", { message: err.message });
+    return sendError(res, err.message, "QR_VERIFY_FAILED", 500);
   }
 });
 
@@ -1588,10 +3218,34 @@ router.get("/blockchain/status", async (req, res) => {
 
 router.get("/blockchain/chain", async (req, res) => {
   try {
-    const chain = drugChainService.getChain();
+    const chain = drugChainService.getFullChain ? drugChainService.getFullChain() : [];
     return sendSuccess(res, chain, "DrugChain raw ledger retrieved");
   } catch (err) {
+    logger.error("Blockchain chain fetch failed", { message: err.message });
     return sendError(res, err.message, "CHAIN_FETCH_FAILED", 500);
+  }
+});
+
+router.get("/blockchain/medicine/:medicineId", async (req, res) => {
+  try {
+    const queryId = req.params.medicineId.trim();
+    const history = drugChainService.getMedicineHistory(queryId);
+    const medicine = await Medicine.findOne({
+      $or: [{ id: new RegExp(`^${queryId}$`, "i") }, { batchId: new RegExp(`^${queryId}$`, "i") }],
+    });
+
+    return sendSuccess(
+      res,
+      {
+        medicineId: queryId,
+        onChainHistory: history,
+        medicineDetails: medicine || null,
+        totalEvents: history.length,
+      },
+      "On-chain medicine record retrieved"
+    );
+  } catch (err) {
+    return sendError(res, err.message, "BLOCKCHAIN_MEDICINE_FAILED", 500);
   }
 });
 
@@ -1627,13 +3281,444 @@ router.post("/uploads/certificate", upload.single("governmentCertificate"), (req
 });
 
 /* ══════════════════════════════════════════════════════════════════════
-   8. QR HELPERS
+   8. SECURE QR GENERATION & HMAC TOKEN VERIFICATION
 ══════════════════════════════════════════════════════════════════════ */
 router.post("/qr/generate", (req, res) => {
   const { medicineId, batchId } = req.body;
   if (!medicineId && !batchId) return sendError(res, "medicineId or batchId required", "MISSING_ID", 400);
-  const payload = JSON.stringify({ medicineId, batchId, timestamp: Date.now() });
-  return sendSuccess(res, { payload, code: batchId || medicineId }, "QR Payload generated");
+
+  const tokenData = generateSecureQRToken(medicineId || "MED-2024-001", batchId || "BATCH-001");
+
+  return sendSuccess(
+    res,
+    {
+      payload: tokenData.token,
+      token: tokenData.token,
+      verificationUrl: tokenData.verificationUrl,
+      code: batchId || medicineId,
+      signedPayload: tokenData.payload,
+    },
+    "Secure HMAC-SHA256 signed QR Payload generated"
+  );
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   9. SECURITY ALERTS — ADMIN / CREATOR ONLY
+   Risk signals generated silently during registration and medicine
+   submission. STRICTLY access-controlled — 403 for any non-Creator.
+══════════════════════════════════════════════════════════════════════ */
+
+// GET /security-alerts — list alerts with optional filters
+router.get("/security-alerts", verifyToken, requireRole("Creator"), async (req, res) => {
+  try {
+    const { status, severity, sourceType, page = 1, limit = 50 } = req.query;
+    const query = {};
+
+    if (status && status !== "ALL") query.status = status.toUpperCase();
+    if (severity && severity !== "ALL") query.severity = severity.toUpperCase();
+    if (sourceType && sourceType !== "ALL") query.sourceType = sourceType.toUpperCase();
+
+    const skip = (Math.max(1, Number(page)) - 1) * Number(limit);
+    const [alerts, total] = await Promise.all([
+      SecurityAlert.find(query).sort({ createdAt: -1 }).skip(skip).limit(Number(limit)),
+      SecurityAlert.countDocuments(query),
+    ]);
+
+    // Counts by severity for dashboard badge
+    const [openCount, criticalCount, highCount] = await Promise.all([
+      SecurityAlert.countDocuments({ status: "OPEN" }),
+      SecurityAlert.countDocuments({ status: "OPEN", severity: "CRITICAL" }),
+      SecurityAlert.countDocuments({ status: "OPEN", severity: "HIGH" }),
+    ]);
+
+    return sendSuccess(
+      res,
+      {
+        alerts,
+        total,
+        openCount,
+        criticalCount,
+        highCount,
+        page: Number(page),
+        limit: Number(limit),
+      },
+      "Security alerts retrieved"
+    );
+  } catch (err) {
+    return sendError(res, err.message, "SECURITY_ALERTS_FAILED", 500);
+  }
+});
+
+// GET /security-alerts/:alertId — single alert detail
+router.get("/security-alerts/:alertId", verifyToken, requireRole("Creator"), async (req, res) => {
+  try {
+    const alert = await SecurityAlert.findById(req.params.alertId);
+    if (!alert) return sendError(res, "Security alert not found", "NOT_FOUND", 404);
+    return sendSuccess(res, alert, "Alert detail retrieved");
+  } catch (err) {
+    return sendError(res, err.message, "ALERT_FETCH_FAILED", 500);
+  }
+});
+
+// PATCH /security-alerts/:alertId/review — mark as reviewed with note
+router.patch("/security-alerts/:alertId/review", verifyToken, requireRole("Creator"), async (req, res) => {
+  try {
+    const { action, note } = req.body; // action: "REVIEWED" | "DISMISSED" | "ESCALATED"
+    const allowedActions = ["REVIEWED", "DISMISSED", "ESCALATED"];
+    if (!action || !allowedActions.includes(action.toUpperCase())) {
+      return sendError(res, `action must be one of: ${allowedActions.join(", ")}`, "INVALID_ACTION", 400);
+    }
+
+    const alert = await SecurityAlert.findById(req.params.alertId);
+    if (!alert) return sendError(res, "Security alert not found", "NOT_FOUND", 404);
+
+    alert.status = action.toUpperCase();
+    alert.reviewedBy = req.user.email;
+    alert.reviewedAt = new Date();
+    alert.reviewNote = (note || "").trim();
+    await alert.save();
+
+    // Audit this review action
+    try {
+      await AuditLog.create({
+        userId: req.user._id,
+        email: req.user.email,
+        role: req.user.role,
+        action: `SECURITY_ALERT_${action.toUpperCase()}`,
+        resource: "SecurityAlert",
+        resourceId: alert._id.toString(),
+        ipAddress: req.ip || "127.0.0.1",
+        result: "SUCCESS",
+        details: { severity: alert.severity, sourceType: alert.sourceType, note },
+      });
+    } catch (auditErr) {}
+
+    return sendSuccess(res, alert, `Alert marked as ${action.toUpperCase()}`);
+  } catch (err) {
+    return sendError(res, err.message, "ALERT_REVIEW_FAILED", 500);
+  }
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   10. SUPPLY CHAIN DIRECTORY — APPROVED MANUFACTURERS & PHARMACIES LISTING
+   Distributors can see all approved Manufacturers to link with.
+   Distributors can see all approved Pharmacies to supply to.
+══════════════════════════════════════════════════════════════════════ */
+
+// GET /manufacturers — list all APPROVED manufacturers (for Distributor use)
+router.get("/manufacturers", verifyToken, requireRole("Distributor", "Creator", "Manufacturer"), async (req, res) => {
+  try {
+    const { search } = req.query;
+    const query = { role: "Manufacturer", accountStatus: "APPROVED" };
+    if (search && search.trim()) {
+      const s = search.trim();
+      query.$or = [
+        { name: new RegExp(s, "i") },
+        { email: new RegExp(s, "i") },
+      ];
+    }
+    const manufacturers = await User.find(query).sort({ createdAt: -1 });
+    const withProfiles = await Promise.all(
+      manufacturers.map(async (u) => {
+        const profile = await getProfileForUser(u);
+        const safe = u.toSafeObject(profile);
+        // Check if this distributor already has a link with this manufacturer
+        let linkStatus = null;
+        if (req.user.role === "Distributor") {
+          const existingLink = await SupplyChainLink.findOne({
+            linkType: "MANUFACTURER_DISTRIBUTOR",
+            fromUserId: u._id,
+            toUserId: req.user._id,
+          });
+          linkStatus = existingLink ? existingLink.status : null;
+        }
+        return {
+          ...safe,
+          linkStatus,
+          profileComplete: !!(safe.companyName && safe.companyCode),
+        };
+      })
+    );
+    return sendSuccess(res, withProfiles, "Approved manufacturers retrieved");
+  } catch (err) {
+    return sendError(res, err.message, "MANUFACTURERS_FETCH_FAILED", 500);
+  }
+});
+
+// GET /pharmacies — list all APPROVED pharmacies (for Distributor use)
+router.get("/pharmacies", verifyToken, requireRole("Distributor", "Creator", "Pharmacy"), async (req, res) => {
+  try {
+    const { search } = req.query;
+    const query = { role: "Pharmacy", accountStatus: "APPROVED" };
+    if (search && search.trim()) {
+      const s = search.trim();
+      query.$or = [
+        { name: new RegExp(s, "i") },
+        { email: new RegExp(s, "i") },
+      ];
+    }
+    const pharmacies = await User.find(query).sort({ createdAt: -1 });
+    const withProfiles = await Promise.all(
+      pharmacies.map(async (u) => {
+        const profile = await getProfileForUser(u);
+        const safe = u.toSafeObject(profile);
+        // Check if this distributor already has a link with this pharmacy
+        let linkStatus = null;
+        if (req.user.role === "Distributor") {
+          const existingLink = await SupplyChainLink.findOne({
+            linkType: "DISTRIBUTOR_PHARMACY",
+            fromUserId: req.user._id,
+            toUserId: u._id,
+          });
+          linkStatus = existingLink ? existingLink.status : null;
+        }
+        return {
+          ...safe,
+          linkStatus,
+          profileComplete: !!(safe.companyName),
+        };
+      })
+    );
+    return sendSuccess(res, withProfiles, "Approved pharmacies retrieved");
+  } catch (err) {
+    return sendError(res, err.message, "PHARMACIES_FETCH_FAILED", 500);
+  }
+});
+
+// GET /distributors — list all APPROVED distributors (for Manufacturer / Pharmacy use)
+router.get("/distributors", verifyToken, requireRole("Manufacturer", "Pharmacy", "Creator", "Distributor"), async (req, res) => {
+  try {
+    const distributors = await User.find({ role: "Distributor", accountStatus: "APPROVED" }).sort({ createdAt: -1 });
+    const withProfiles = await Promise.all(
+      distributors.map(async (u) => {
+        const profile = await getProfileForUser(u);
+        const safe = u.toSafeObject(profile);
+        let linkStatus = null;
+        if (req.user.role === "Manufacturer") {
+          const existingLink = await SupplyChainLink.findOne({
+            linkType: "MANUFACTURER_DISTRIBUTOR",
+            fromUserId: req.user._id,
+            toUserId: u._id,
+          });
+          linkStatus = existingLink ? existingLink.status : null;
+        }
+        return { ...safe, linkStatus };
+      })
+    );
+    return sendSuccess(res, withProfiles, "Approved distributors retrieved");
+  } catch (err) {
+    return sendError(res, err.message, "DISTRIBUTORS_FETCH_FAILED", 500);
+  }
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   11. SUPPLY CHAIN LINKING — Persistent Manufacturer↔Distributor &
+       Distributor↔Pharmacy Relationship Management
+══════════════════════════════════════════════════════════════════════ */
+
+// POST /supply-chain/link — create a supply-chain link between two parties
+router.post("/supply-chain/link", verifyToken, requireRole("Manufacturer", "Distributor", "Creator"), async (req, res) => {
+  try {
+    const { targetUserId, linkType } = req.body;
+
+    if (!targetUserId) {
+      return sendError(res, "targetUserId is required", "MISSING_TARGET", 400);
+    }
+
+    const allowedLinkTypes = ["MANUFACTURER_DISTRIBUTOR", "DISTRIBUTOR_PHARMACY"];
+    const resolvedLinkType = linkType || (req.user.role === "Manufacturer" ? "MANUFACTURER_DISTRIBUTOR" : "DISTRIBUTOR_PHARMACY");
+
+    if (!allowedLinkTypes.includes(resolvedLinkType)) {
+      return sendError(res, `linkType must be one of: ${allowedLinkTypes.join(", ")}`, "INVALID_LINK_TYPE", 400);
+    }
+
+    // Validate the target user exists and is approved
+    const targetUser = await User.findById(targetUserId);
+    if (!targetUser) {
+      return sendError(res, "Target user not found", "TARGET_NOT_FOUND", 404);
+    }
+    if (targetUser.accountStatus !== "APPROVED") {
+      return sendError(res, "Target user is not yet approved. Only approved supply-chain partners can be linked.", "TARGET_NOT_APPROVED", 400);
+    }
+
+    // Validate roles
+    const myRole = req.user.role;
+    const targetRole = targetUser.role;
+    if (resolvedLinkType === "MANUFACTURER_DISTRIBUTOR") {
+      if (myRole !== "Manufacturer" && myRole !== "Creator") {
+        return sendError(res, "Only Manufacturers or Creator can create Manufacturer-Distributor links", "ROLE_MISMATCH", 403);
+      }
+      if (targetRole !== "Distributor") {
+        return sendError(res, "Target must be a Distributor for MANUFACTURER_DISTRIBUTOR links", "ROLE_MISMATCH", 400);
+      }
+    } else if (resolvedLinkType === "DISTRIBUTOR_PHARMACY") {
+      if (myRole !== "Distributor" && myRole !== "Creator") {
+        return sendError(res, "Only Distributors or Creator can create Distributor-Pharmacy links", "ROLE_MISMATCH", 403);
+      }
+      if (targetRole !== "Pharmacy") {
+        return sendError(res, "Target must be a Pharmacy for DISTRIBUTOR_PHARMACY links", "ROLE_MISMATCH", 400);
+      }
+    }
+
+    // Get both parties' company names for denormalization
+    const myProfile = req.userProfile || await getProfileForUser(req.user);
+    const myCompany = (myProfile?.companyName || myProfile?.pharmacyName || req.user.name || "").trim();
+    const targetProfile = await getProfileForUser(targetUser);
+    const targetCompany = (targetProfile?.companyName || targetProfile?.pharmacyName || targetUser.name || "").trim();
+
+    // Prevent duplicate links
+    const existing = await SupplyChainLink.findOne({
+      linkType: resolvedLinkType,
+      fromUserId: req.user._id,
+      toUserId: targetUserId,
+    });
+
+    if (existing) {
+      if (existing.status === "APPROVED") {
+        return sendError(res, "A supply-chain link already exists between these parties", "DUPLICATE_LINK", 409);
+      }
+      // Reactivate rejected link
+      existing.status = "APPROVED";
+      existing.approvedAt = new Date();
+      existing.rejectionReason = "";
+      await existing.save();
+      return sendSuccess(res, existing, "Supply-chain link reactivated successfully");
+    }
+
+    const link = await SupplyChainLink.create({
+      linkType: resolvedLinkType,
+      fromUserId: req.user._id,
+      fromCompanyName: myCompany,
+      fromRole: req.user.role,
+      toUserId: targetUserId,
+      toCompanyName: targetCompany,
+      toRole: targetUser.role,
+      status: "APPROVED",
+      approvedAt: new Date(),
+    });
+
+    try {
+      await AuditLog.create({
+        userId: req.user._id,
+        email: req.user.email,
+        role: req.user.role,
+        action: `SUPPLY_CHAIN_LINK_CREATED`,
+        resource: "SupplyChainLink",
+        resourceId: link._id.toString(),
+        ipAddress: req.ip || "127.0.0.1",
+        result: "SUCCESS",
+        details: { linkType: resolvedLinkType, fromCompany: myCompany, toCompany: targetCompany },
+      });
+    } catch (e) {}
+
+    return sendSuccess(res, link, `${resolvedLinkType.replace("_", "→")} supply-chain link established successfully`, 201);
+  } catch (err) {
+    if (err.code === 11000) {
+      return sendError(res, "A supply-chain link already exists between these parties", "DUPLICATE_LINK", 409);
+    }
+    return sendError(res, err.message, "LINK_FAILED", 500);
+  }
+});
+
+// GET /supply-chain/links — list my supply-chain links (both incoming and outgoing)
+router.get("/supply-chain/links", verifyToken, async (req, res) => {
+  try {
+    const { linkType, direction } = req.query;
+    const query = {};
+
+    if (linkType && linkType !== "ALL") {
+      query.linkType = linkType;
+    }
+
+    // By default: show all links where I am either from or to party
+    if (direction === "outgoing") {
+      query.fromUserId = req.user._id;
+    } else if (direction === "incoming") {
+      query.toUserId = req.user._id;
+    } else {
+      query.$or = [{ fromUserId: req.user._id }, { toUserId: req.user._id }];
+    }
+
+    const links = await SupplyChainLink.find(query).sort({ createdAt: -1 });
+    return sendSuccess(res, links, "Supply-chain links retrieved");
+  } catch (err) {
+    return sendError(res, err.message, "LINKS_FETCH_FAILED", 500);
+  }
+});
+
+// DELETE /supply-chain/links/:id — remove a supply-chain link
+router.delete("/supply-chain/links/:id", verifyToken, requireRole("Manufacturer", "Distributor", "Creator"), async (req, res) => {
+  try {
+    const link = await SupplyChainLink.findById(req.params.id);
+    if (!link) return sendError(res, "Link not found", "NOT_FOUND", 404);
+
+    // Only from-party or Creator can remove a link
+    if (link.fromUserId.toString() !== req.user._id.toString() && req.user.role !== "Creator") {
+      return sendError(res, "You are not authorized to remove this link", "FORBIDDEN", 403);
+    }
+
+    await link.deleteOne();
+    return sendSuccess(res, { id: req.params.id }, "Supply-chain link removed");
+  } catch (err) {
+    return sendError(res, err.message, "LINK_DELETE_FAILED", 500);
+  }
+});
+
+// GET /supply-chain/my-manufacturers — shortcut for Distributor to see their linked manufacturers
+router.get("/supply-chain/my-manufacturers", verifyToken, requireRole("Distributor", "Creator"), async (req, res) => {
+  try {
+    const links = await SupplyChainLink.find({
+      linkType: "MANUFACTURER_DISTRIBUTOR",
+      toUserId: req.user._id,
+      status: "APPROVED",
+    });
+
+    const manufacturers = await Promise.all(
+      links.map(async (link) => {
+        const mfrUser = await User.findById(link.fromUserId);
+        if (!mfrUser) return null;
+        const profile = await getProfileForUser(mfrUser);
+        return {
+          ...mfrUser.toSafeObject(profile),
+          linkId: link._id,
+          linkedAt: link.createdAt,
+        };
+      })
+    );
+
+    return sendSuccess(res, manufacturers.filter(Boolean), "Linked manufacturers retrieved");
+  } catch (err) {
+    return sendError(res, err.message, "LINKED_MANUFACTURERS_FAILED", 500);
+  }
+});
+
+// GET /supply-chain/my-pharmacies — shortcut for Distributor to see their linked pharmacies
+router.get("/supply-chain/my-pharmacies", verifyToken, requireRole("Distributor", "Creator"), async (req, res) => {
+  try {
+    const links = await SupplyChainLink.find({
+      linkType: "DISTRIBUTOR_PHARMACY",
+      fromUserId: req.user._id,
+      status: "APPROVED",
+    });
+
+    const pharmacies = await Promise.all(
+      links.map(async (link) => {
+        const pharmUser = await User.findById(link.toUserId);
+        if (!pharmUser) return null;
+        const profile = await getProfileForUser(pharmUser);
+        return {
+          ...pharmUser.toSafeObject(profile),
+          linkId: link._id,
+          linkedAt: link.createdAt,
+        };
+      })
+    );
+
+    return sendSuccess(res, pharmacies.filter(Boolean), "Linked pharmacies retrieved");
+  } catch (err) {
+    return sendError(res, err.message, "LINKED_PHARMACIES_FAILED", 500);
+  }
 });
 
 export default router;
+

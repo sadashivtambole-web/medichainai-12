@@ -27,9 +27,9 @@ const techStack = [
   },
   {
     category: "Backend",
-    color: "#6366F1",
-    bg: "rgba(99,102,241,0.08)",
-    border: "rgba(99,102,241,0.2)",
+    color: "#0284C7",
+    bg: "rgba(2,132,199,0.08)",
+    border: "rgba(2,132,199,0.2)",
     items: [
       { name: "Node.js 24", detail: "JS runtime (ES Modules)" },
       { name: "Express 4", detail: "REST API framework" },
@@ -43,9 +43,9 @@ const techStack = [
   },
   {
     category: "Blockchain",
-    color: "#8B5CF6",
-    bg: "rgba(139,92,246,0.08)",
-    border: "rgba(139,92,246,0.2)",
+    color: "#0D9488",
+    bg: "rgba(13,148,136,0.08)",
+    border: "rgba(13,148,136,0.2)",
     items: [
       { name: "DrugChain PoA", detail: "Custom private blockchain" },
       { name: "SHA-256 Hashing", detail: "Cryptographic data integrity" },
@@ -72,16 +72,16 @@ const techStack = [
 ];
 
 const architectureFlow = [
-  { step: 1, title: "User Registration", desc: "Email OTP → Creator approval → Role assignment → Temporary password", color: "#6366F1", icon: Users },
-  { step: 2, title: "Medicine Registration", desc: "Tablet image → AI/OCR extraction → Data hash → DrugChain block", color: "#8B5CF6", icon: Brain },
-  { step: 3, title: "QR Code Generation", desc: "Unique QR with medicineId + batchId → Cryptographically signed", color: "#06B6D4", icon: QrCode },
+  { step: 1, title: "User Registration", desc: "Email OTP → Creator approval → Role assignment → Temporary password", color: "#0284C7", icon: Users },
+  { step: 2, title: "Medicine Registration", desc: "Tablet image → AI/OCR extraction → Data hash → DrugChain block", color: "#0D9488", icon: Brain },
+  { step: 3, title: "QR Code Generation", desc: "Unique QR with medicineId + batchId → Cryptographically signed", color: "#0284C7", icon: QrCode },
   { step: 4, title: "Supply Chain Transfer", desc: "Manufacturer → Distributor → Pharmacy → each step on-chain", color: "#10B981", icon: GitBranch },
   { step: 5, title: "Public Verification", desc: "Scan QR → Backend lookup → Blockchain + AI check → Result", color: "#F59E0B", icon: ShieldCheck },
 ];
 
 const systemModules = [
-  { title: "Creator Console", desc: "Master admin with full system visibility: user approvals, all medicines, all transfers, blockchain audit, system health.", icon: Lock, color: "#6366F1" },
-  { title: "Manufacturer Portal", desc: "5-step registration wizard: manufacturer details → medicine info → AI/OCR verification → QR preview → blockchain record.", icon: Building2, color: "#8B5CF6" },
+  { title: "Creator Console", desc: "Master admin with full system visibility: user approvals, all medicines, all transfers, blockchain audit, system health.", icon: Lock, color: "#0284C7" },
+  { title: "Manufacturer Portal", desc: "5-step registration wizard: manufacturer details → medicine info → AI/OCR verification → QR preview → blockchain record.", icon: Building2, color: "#0D9488" },
   { title: "Distributor Hub", desc: "Incoming transfer dashboard: confirm receipt → forward to pharmacy. Each step recorded on DrugChain.", icon: Server, color: "#06B6D4" },
   { title: "Pharmacy Dashboard", desc: "Receive batches, scan QR codes, run full verification check, manage medicine shelf inventory.", icon: Database, color: "#10B981" },
   { title: "Customer Verify", desc: "Camera QR scan / image upload / manual code entry → full verification with blockchain proof and supply chain history.", icon: ShieldCheck, color: "#F59E0B" },
@@ -109,7 +109,7 @@ export default function About() {
             marginBottom: 40, boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
             transition: "all 0.2s ease",
           }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = "#6366F1"; e.currentTarget.style.color = "#6366F1"; }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = "#0284C7"; e.currentTarget.style.color = "#0284C7"; }}
           onMouseLeave={e => { e.currentTarget.style.borderColor = "#E2E8F0"; e.currentTarget.style.color = "#0F172A"; }}
         >
           <ArrowLeft size={15} /> Back to Home
@@ -131,7 +131,7 @@ export default function About() {
             }}
           >
             About{" "}
-            <span className="gradient-text-primary">DrugChain</span>
+            <span className="gradient-text-primary">MediChainAI</span>
           </h1>
           <p style={{ fontSize: 17, color: "#475569", lineHeight: 1.7, maxWidth: 700, margin: "0 auto 32px" }}>
             A full-stack pharmaceutical authenticity platform combining private blockchain, AI/OCR tablet analysis, 
@@ -141,12 +141,12 @@ export default function About() {
           {/* Key facts */}
           <div style={{ display: "flex", justifyContent: "center", gap: 16, flexWrap: "wrap" }}>
             {[
-              { val: "5", label: "Roles & Dashboards", color: "#6366F1" },
-              { val: "100+", label: "API Endpoints", color: "#8B5CF6" },
-              { val: "PoA", label: "Blockchain Consensus", color: "#06B6D4" },
-              { val: "AI", label: "OCR Verification", color: "#10B981" },
+              { val: "5", label: "Roles & Dashboards", color: "#0284C7" },
+              { val: "100+", label: "API Endpoints", color: "#0D9488" },
+              { val: "PoA", label: "Blockchain Consensus", color: "#0284C7" },
+              { val: "AI", label: "OCR Verification", color: "#059669" },
             ].map(f => (
-              <div key={f.label} style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 16, padding: "16px 26px", boxShadow: "0 4px 16px rgba(99,102,241,0.04)", textAlign: "center", minWidth: 130 }}>
+              <div key={f.label} style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 16, padding: "16px 26px", boxShadow: "0 4px 16px rgba(2,132,199,0.06)", textAlign: "center", minWidth: 130 }}>
                 <div style={{ fontSize: 26, fontWeight: 800, color: f.color, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{f.val}</div>
                 <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#94A3B8", marginTop: 4 }}>{f.label}</div>
               </div>
@@ -296,13 +296,13 @@ export default function About() {
           <div
             className="animate-fade-in-up"
             style={{
-              background: "linear-gradient(135deg, #4F46E5 0%, #6366F1 50%, #7C3AED 100%)",
+              background: "linear-gradient(135deg, #0284C7 0%, #0369A1 50%, #0D9488 100%)",
               borderRadius: 28,
               padding: "48px 48px",
               textAlign: "center",
               position: "relative",
               overflow: "hidden",
-              boxShadow: "0 20px 60px rgba(99,102,241,0.35)",
+              boxShadow: "0 20px 60px rgba(2,132,199,0.3)",
             }}
           >
             <div style={{ position: "absolute", top: -40, left: -40, width: 160, height: 160, borderRadius: "50%", background: "rgba(255,255,255,0.06)" }} />

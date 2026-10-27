@@ -1,4 +1,4 @@
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Link2 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 
 export default function BlockchainStatus({ status, txHash, compact = false }) {
@@ -6,126 +6,72 @@ export default function BlockchainStatus({ status, txHash, compact = false }) {
   const currentStatus = status || blockchainInfo?.status || "Connected";
   const isConnected = currentStatus === "Connected" || currentStatus === "Confirmed";
 
-  const networkName = blockchainInfo?.network || "EVM Local / Hardhat";
-  const blockHeight = blockchainInfo?.blockNumber ? `#${blockchainInfo.blockNumber}` : "#12,847";
-  const confirmations = isConnected ? "12 (Finalized)" : "0";
+  const networkName = blockchainInfo?.network || "DrugChain PoA Network";
+  const blockHeight = blockchainInfo?.blockHeight || blockchainInfo?.totalBlocks || (blockchainInfo?.blockNumber ? `#${blockchainInfo.blockNumber}` : "Ledger Synced");
+  const confirmations = isConnected ? "PoA Verified (Immutable)" : "Pending";
 
   if (compact) {
     return (
       <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "8px 14px",
-          borderRadius: 10,
-          background: isConnected ? "#F0FDF4" : "#FEF3C7",
-          border: `1px solid ${isConnected ? "rgba(16,185,129,0.3)" : "rgba(245,158,11,0.3)"}`,
-        }}
+        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold ${
+          isConnected
+            ? "bg-emerald-50/80 border-emerald-200 text-emerald-800"
+            : "bg-amber-50/80 border-amber-200 text-amber-800"
+        }`}
       >
         <div
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: "50%",
-            background: isConnected ? "#10B981" : "#D97706",
-            boxShadow: `0 0 6px ${isConnected ? "#10B981" : "#D97706"}`,
-          }}
+          className={`w-2 h-2 rounded-full ${
+            isConnected ? "bg-emerald-500 shadow-[0_0_6px_#10B981]" : "bg-amber-500 shadow-[0_0_6px_#F59E0B]"
+          }`}
         />
-        <span
-          style={{
-            fontFamily: "'Plus Jakarta Sans', sans-serif",
-            fontSize: 12,
-            fontWeight: 700,
-            color: isConnected ? "#065F46" : "#92400E",
-          }}
-        >
-          Blockchain {currentStatus}
-        </span>
+        <span>Blockchain {currentStatus}</span>
       </div>
     );
   }
 
   return (
-    <div
-      style={{
-        background: "#FFFFFF",
-        border: "1px solid #E8EAF6",
-        borderRadius: 16,
-        padding: "20px 24px",
-        boxShadow: "0 2px 10px rgba(0,0,0,0.02)",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-        <div
-          style={{
-            width: 10,
-            height: 10,
-            borderRadius: "50%",
-            background: isConnected ? "#10B981" : "#D97706",
-            boxShadow: `0 0 8px ${isConnected ? "#10B981" : "#D97706"}`,
-          }}
-        />
-        <span
-          style={{
-            fontFamily: "'Plus Jakarta Sans', sans-serif",
-            fontWeight: 800,
-            fontSize: 14,
-            color: isConnected ? "#065F46" : "#92400E",
-          }}
-        >
-          🔗 Blockchain {isConnected ? "Connected" : "Pending"}
+    <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2.5">
+          <div
+            className={`w-2.5 h-2.5 rounded-full ${
+              isConnected ? "bg-emerald-500 shadow-[0_0_8px_#10B981]" : "bg-amber-500"
+            }`}
+          />
+          <span className="font-extrabold text-sm text-slate-900">
+            DrugChain Ledger {isConnected ? "Connected" : "Pending"}
+          </span>
+        </div>
+        <span className="text-[10px] font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-100 uppercase tracking-wider">
+          PoA Consensus
         </span>
       </div>
 
       {txHash && (
-        <div>
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              color: "#8E8FA8",
-              marginBottom: 6,
-            }}
-          >
+        <div className="mb-4">
+          <div className="text-[10px] font-bold tracking-wider uppercase text-slate-400 mb-1.5">
             Transaction Hash
           </div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              fontFamily: "monospace",
-              fontSize: 12,
-              fontWeight: 600,
-              color: "#5855F3",
-              background: "#EEF0FD",
-              border: "1px solid rgba(88,85,243,0.2)",
-              borderRadius: 8,
-              padding: "8px 12px",
-            }}
-          >
-            {txHash}
-            <ExternalLink size={12} style={{ flexShrink: 0, opacity: 0.7 }} />
+          <div className="flex items-center justify-between gap-2 font-mono text-xs text-sky-800 bg-sky-50/70 border border-sky-200/80 rounded-xl px-3 py-2">
+            <span className="truncate">{txHash}</span>
+            <ExternalLink size={13} className="shrink-0 text-sky-600 opacity-80" />
           </div>
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 24, marginTop: 16 }}>
-        {[
-          { label: "Network", value: networkName },
-          { label: "Block", value: blockHeight },
-          { label: "Confirmations", value: confirmations },
-        ].map(({ label, value }) => (
-          <div key={label}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#8E8FA8" }}>
-              {label}
-            </div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#18182E", marginTop: 3 }}>{value}</div>
-          </div>
-        ))}
+      <div className="grid grid-cols-3 gap-4 pt-3 border-t border-slate-100 text-xs">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Network</p>
+          <p className="font-bold text-slate-800 mt-0.5 truncate">{networkName}</p>
+        </div>
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Ledger Block</p>
+          <p className="font-bold text-slate-800 mt-0.5">{blockHeight}</p>
+        </div>
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">State</p>
+          <p className="font-bold text-emerald-600 mt-0.5 truncate">{confirmations}</p>
+        </div>
       </div>
     </div>
   );

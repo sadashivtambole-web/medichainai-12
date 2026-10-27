@@ -23,7 +23,18 @@ export const medicineService = {
     const res = await api.post("/medicines", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
-    return res.data;
+
+    // Backend returns { success: false, alreadyRegistered: true, data: {...} } for duplicate batches.
+    // Throw a typed error so the UI can show the existing record instead of a generic error toast.
+    if (res && res.alreadyRegistered) {
+      const error = new Error(res.message || "This batch is already registered.");
+      error.alreadyRegistered = true;
+      error.existingRecord = res.data;
+      error.code = res.code;
+      throw error;
+    }
+
+    return res.data || res;
   },
 
   async getAllMedicines() {
@@ -34,5 +45,19 @@ export const medicineService = {
   async getMedicineById(id) {
     const res = await api.get(`/medicines/${encodeURIComponent(id)}`);
     return res.data || null;
+  },
+
+  /**
+   * Pre-check if a batch number is already registered before submitting the form.
+   * Returns { registered: true, record: {...} } or { registered: false }
+   */
+  async checkBatchExists(batchNumber) {
+    try {
+      const res = await api.get(`/medicines/${encodeURIComponent(batchNumber.trim().toUpperCase())}`);
+      if (res.data) return { registered: true, record: res.data };
+      return { registered: false };
+    } catch {
+      return { registered: false };
+    }
   },
 };

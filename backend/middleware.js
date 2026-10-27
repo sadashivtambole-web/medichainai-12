@@ -3,6 +3,12 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { User } from "./models.js";
+import { logger } from "./utils/logger.js";
+import { getProfileForUser } from "./services/profileService.js";
+
+// Single source of truth for JWT secret
+export const getJwtSecret = () => process.env.JWT_SECRET || "changeme_set_JWT_SECRET_in_dotenv";
+const EFFECTIVE_JWT_SECRET = getJwtSecret();
 
 /* ── DISK STORAGE CONFIGURATION (Stores files on disk, reference in MongoDB) ── */
 const UPLOADS_DIR = path.resolve("uploads");
@@ -102,10 +108,7 @@ export const verifyToken = async (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "super_secret_jwt_key_fake_drug_detection_2026"
-    );
+    const decoded = jwt.verify(token, getJwtSecret());
     const userId = decoded.id || decoded.userId;
     const user = await User.findById(userId);
     if (!user) {
@@ -144,8 +147,17 @@ export const verifyToken = async (req, res, next) => {
     }
 
     req.user = user;
+    try {
+      req.userProfile = await getProfileForUser(user);
+      if (req.userProfile && !req.user.company) {
+        req.user.company = req.userProfile.companyName || req.userProfile.pharmacyName || "";
+      }
+    } catch (profErr) {
+      req.userProfile = null;
+    }
     next();
   } catch (err) {
+    logger.auth("Token verification failed", { ip: req?.ip });
     return res.status(401).json({
       success: false,
       message: "Invalid or expired authorization token",

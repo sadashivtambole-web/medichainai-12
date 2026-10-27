@@ -134,21 +134,20 @@ async function runTests() {
   assert(regResult.blockIndex >= 2, `Block index #${regResult.blockIndex} created for registration`);
   assert(regResult.dataHash.length === 64, "Medicine data hash generated and stored");
 
-  // Duplicate batch test
-  let duplicateCaught = false;
-  try {
-    await service.registerMedicine({
-      medicineId: "MED-DUPLICATE",
-      batchNumber: "BT-PARA-100",
-      medicineName: "Fake Copy",
-      manufacturerCode: "MFR-FAKE",
-      manufacturingDate: "2024-02-01",
-      expiryDate: "2026-02-01",
-    });
-  } catch (e) {
-    duplicateCaught = true;
-  }
-  assert(duplicateCaught === true, "Duplicate registration of registered batch is strictly rejected");
+  // Duplicate batch test: new behavior returns alreadyExists:true instead of throwing
+  const dupResult = await service.registerMedicine({
+    medicineId: "MED-DUPLICATE",
+    batchNumber: "BT-PARA-100",
+    medicineName: "Fake Copy",
+    manufacturerCode: "MFR-FAKE",
+    manufacturingDate: "2024-02-01",
+    expiryDate: "2026-02-01",
+  });
+  assert(
+    dupResult.alreadyExists === true && dupResult.batchNumber === "BT-PARA-100",
+    "Duplicate registration of registered batch returns alreadyExists:true with existing chain record"
+  );
+
 
   /* ───────────────────────────────────────────────────────────
      6. SUPPLY CHAIN TRANSFER WORKFLOW

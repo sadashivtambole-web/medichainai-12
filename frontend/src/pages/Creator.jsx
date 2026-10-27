@@ -32,6 +32,10 @@ import {
   Mail,
   Send,
   Sparkles,
+  BellRing,
+  TriangleAlert,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import Background from "../components/layout/Background";
 import { useApp } from "../context/AppContext";
@@ -49,6 +53,7 @@ export default function Creator() {
   const currentPath = location.pathname;
   let activeTab = "overview";
   if (currentPath.includes("approvals")) activeTab = "approvals";
+  else if (currentPath.includes("security-alerts")) activeTab = "security-alerts";
   else if (currentPath.includes("users")) activeTab = "users";
   else if (currentPath.includes("medicines")) activeTab = "medicines";
   else if (currentPath.includes("transfers")) activeTab = "transfers";
@@ -100,6 +105,15 @@ export default function Creator() {
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditResult, setAuditResult] = useState(null);
 
+  // Security Alerts state (Creator only)
+  const [securityAlerts, setSecurityAlerts] = useState([]);
+  const [alertStats, setAlertStats] = useState({ openCount: 0, criticalCount: 0, highCount: 0 });
+  const [alertFilters, setAlertFilters] = useState({ status: "OPEN", severity: "ALL", sourceType: "ALL" });
+  const [alertsLoading, setAlertsLoading] = useState(false);
+  const [expandedAlertId, setExpandedAlertId] = useState(null);
+  const [reviewingAlertId, setReviewingAlertId] = useState(null);
+  const [reviewNote, setReviewNote] = useState("");
+
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -138,9 +152,33 @@ export default function Creator() {
     }
   };
 
+  const fetchSecurityAlerts = async (filters = alertFilters) => {
+    setAlertsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (filters.status !== "ALL") params.append("status", filters.status);
+      if (filters.severity !== "ALL") params.append("severity", filters.severity);
+      if (filters.sourceType !== "ALL") params.append("sourceType", filters.sourceType);
+      const res = await api.get(`/security-alerts?${params.toString()}`);
+      if (res?.data) {
+        const d = res.data;
+        setSecurityAlerts(Array.isArray(d.alerts) ? d.alerts : []);
+        setAlertStats({ openCount: d.openCount || 0, criticalCount: d.criticalCount || 0, highCount: d.highCount || 0 });
+      }
+    } catch (err) {
+      console.warn("Security alerts fetch:", err.message);
+    } finally {
+      setAlertsLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, [activeTab, roleFilter, statusFilter]);
+
+  useEffect(() => {
+    if (activeTab === "security-alerts") fetchSecurityAlerts();
+  }, [activeTab]);
 
   // Handle OCR Analysis Request
   const handleRunOcr = async (userId) => {
@@ -160,14 +198,23 @@ export default function Creator() {
     }
   };
 
-  // Execute Approval with Temporary Password Dispatch
+  // Execute Approval — shows accurate email delivery status
   const handleConfirmApproval = async () => {
     if (!confirmApproveUser) return;
     setActionLoading(true);
     try {
       const res = await authService.approveUser(confirmApproveUser._id);
       if (res.success) {
-        toast.success(`Approved ${confirmApproveUser.name}! Login credentials sent.`);
+        const emailInfo = res.data?.emailNotification;
+        if (emailInfo?.status === "SENT") {
+          toast.success(`✅ ${confirmApproveUser.name} approved! Notification email delivered successfully.`);
+        } else if (emailInfo?.skipped) {
+          toast.success(`✅ ${confirmApproveUser.name} was already approved.`);
+        } else {
+          // Approval saved, email failed — show warning NOT error
+          toast.success(`✅ ${confirmApproveUser.name} approved and account activated.`, { duration: 3000 });
+          toast.error(`⚠️ Notification email could not be delivered. Use "Resend Notification" to retry.`, { duration: 6000 });
+        }
         setConfirmApproveUser(null);
         setSelectedCandidate(null);
         fetchData();
@@ -181,7 +228,7 @@ export default function Creator() {
     }
   };
 
-  // Execute Rejection
+  // Execute Rejection — shows accurate email delivery status
   const handleConfirmRejection = async () => {
     if (!rejectModalUser) return;
     setActionLoading(true);
@@ -189,7 +236,15 @@ export default function Creator() {
       const reason = rejectReason.trim() || "Submitted identity documents or organization credentials could not be verified.";
       const res = await authService.rejectUser(rejectModalUser._id, reason);
       if (res.success) {
-        toast.success(`Application for ${rejectModalUser.name} has been rejected.`);
+        const emailInfo = res.data?.emailNotification;
+        if (emailInfo?.status === "SENT") {
+          toast.success(`Application for ${rejectModalUser.name} rejected. Notification email sent.`);
+        } else if (emailInfo?.skipped) {
+          toast.success(`Application for ${rejectModalUser.name} was already rejected.`);
+        } else {
+          toast.success(`Application for ${rejectModalUser.name} rejected.`, { duration: 3000 });
+          toast.error(`⚠️ Notification email could not be delivered. Use "Resend Notification" to retry.`, { duration: 6000 });
+        }
         setRejectModalUser(null);
         setSelectedCandidate(null);
         setRejectReason("");
@@ -204,7 +259,7 @@ export default function Creator() {
     }
   };
 
-  // Resend Login Credentials
+  // Resend Login Credentials (generates new temp password)
   const handleResendCredentials = async (userId, userName) => {
     try {
       toast.loading(`Generating new credentials for ${userName}...`, { id: "resend" });
@@ -217,6 +272,22 @@ export default function Creator() {
       }
     } catch (err) {
       toast.error(err.message || "Failed to dispatch email.", { id: "resend" });
+    }
+  };
+
+  // Resend Notification Email (no password change — just resend approval/rejection notice)
+  const handleResendNotification = async (userId, userName) => {
+    try {
+      toast.loading(`Resending notification to ${userName}...`, { id: "resend-notif" });
+      const res = await authService.resendNotification(userId);
+      if (res.success) {
+        toast.success(`Notification email resent to ${userName}!`, { id: "resend-notif" });
+        fetchData();
+      } else {
+        toast.error(res.message || "Failed to resend notification.", { id: "resend-notif" });
+      }
+    } catch (err) {
+      toast.error(err.message || "Failed to resend notification.", { id: "resend-notif" });
     }
   };
 
@@ -250,6 +321,13 @@ export default function Creator() {
     { id: "medicines", label: "Registered Medicines", path: "/creator/medicines", icon: Pill },
     { id: "transfers", label: "Active Transfers", path: "/creator/transfers", icon: Truck },
     { id: "blockchain", label: "DrugChain Ledger & Audit", path: "/creator/blockchain", icon: ShieldCheck },
+    {
+      id: "security-alerts",
+      label: alertStats.openCount > 0 ? `⚠ Danger Alerts (${alertStats.openCount})` : "Danger Alerts",
+      path: "/creator/security-alerts",
+      icon: BellRing,
+      danger: alertStats.criticalCount > 0,
+    },
   ];
 
   return (
@@ -288,11 +366,11 @@ export default function Creator() {
                 width: 42,
                 height: 42,
                 borderRadius: 12,
-                background: "linear-gradient(135deg, #7C3AED, #5855F3)",
+                background: "linear-gradient(135deg, #0284C7, #0369A1)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                boxShadow: "0 4px 14px rgba(124, 58, 237, 0.3)",
+                boxShadow: "0 4px 14px rgba(2, 132, 199, 0.3)",
               }}
             >
               <Crown size={22} color="white" />
@@ -303,12 +381,12 @@ export default function Creator() {
                   fontFamily: "'Plus Jakarta Sans', sans-serif",
                   fontSize: 16,
                   fontWeight: 800,
-                  color: "#18182E",
+                  color: "#0F172A",
                 }}
               >
-                DrugChain Creator Console
+                MediChainAI Creator Console
               </div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#7C3AED" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#0284C7" }}>
                 Super Administrator Authority
               </div>
             </div>
@@ -317,10 +395,10 @@ export default function Creator() {
           {/* Creator User Info & Logout */}
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: "#18182E" }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: "#0F172A" }}>
                 {user?.name || "System Creator"}
               </div>
-              <div style={{ fontSize: 11, color: "#5F607A" }}>{user?.email}</div>
+              <div style={{ fontSize: 11, color: "#64748B" }}>{user?.email}</div>
             </div>
 
             <button
@@ -365,12 +443,13 @@ export default function Creator() {
             overflowX: "auto",
             paddingBottom: 4,
             marginBottom: 28,
-            borderBottom: "1px solid #E8EAF6",
+            borderBottom: "1px solid #E2E8F0",
           }}
         >
           {navTabs.map((tab) => {
             const Icon = tab.icon;
             const isSelected = activeTab === tab.id;
+            const isDanger = tab.danger;
             return (
               <button
                 key={tab.id}
@@ -381,19 +460,19 @@ export default function Creator() {
                   gap: 8,
                   padding: "12px 18px",
                   borderRadius: "12px 12px 0 0",
-                  background: isSelected ? "#FFFFFF" : "transparent",
-                  border: isSelected ? "1px solid #E8EAF6" : "1px solid transparent",
-                  borderBottom: isSelected ? "2px solid #5855F3" : "none",
+                  background: isSelected ? (isDanger ? "#FEF2F2" : "#FFFFFF") : "transparent",
+                  border: isSelected ? `1px solid ${isDanger ? "#FECACA" : "#E2E8F0"}` : "1px solid transparent",
+                  borderBottom: isSelected ? `2px solid ${isDanger ? "#DC2626" : "#0284C7"}` : "none",
                   cursor: "pointer",
                   fontFamily: "'Plus Jakarta Sans', sans-serif",
                   fontSize: 13,
                   fontWeight: isSelected ? 800 : 600,
-                  color: isSelected ? "#5855F3" : "#5F607A",
+                  color: isSelected ? (isDanger ? "#DC2626" : "#0284C7") : (isDanger && alertStats.criticalCount > 0 ? "#DC2626" : "#64748B"),
                   transition: "all 0.2s",
                   whiteSpace: "nowrap",
                 }}
               >
-                <Icon size={16} color={isSelected ? "#5855F3" : "#8E8FA8"} />
+                <Icon size={16} color={isSelected ? (isDanger ? "#DC2626" : "#0284C7") : "#94A3B8"} />
                 {tab.label}
               </button>
             );
@@ -436,12 +515,12 @@ export default function Creator() {
             {/* Metrics Grid */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 32 }}>
               {[
-                { title: "Total Users", value: stats.totalUsers, icon: Users, color: "#5855F3", bg: "#EEF0FD" },
+                { title: "Total Users", value: stats.totalUsers, icon: Users, color: "#0284C7", bg: "#F0F9FF" },
                 { title: "Pending Approvals", value: stats.pendingApprovals, icon: UserCheck, color: "#D97706", bg: "#FFFBEB", onClick: () => navigate("/creator/approvals") },
-                { title: "Approved Manufacturers", value: stats.approvedManufacturers, icon: Building2, color: "#2563EB", bg: "#EFF6FF" },
-                { title: "Approved Distributors", value: stats.approvedDistributors, icon: Server, color: "#7C3AED", bg: "#F5F3FF" },
+                { title: "Approved Manufacturers", value: stats.approvedManufacturers, icon: Building2, color: "#0284C7", bg: "#F0F9FF" },
+                { title: "Approved Distributors", value: stats.approvedDistributors, icon: Server, color: "#0D9488", bg: "#F0FDFA" },
                 { title: "Approved Pharmacies", value: stats.approvedPharmacies, icon: Store, color: "#059669", bg: "#ECFDF5" },
-                { title: "Registered Medicines", value: stats.registeredMedicines, icon: Pill, color: "#5855F3", bg: "#EEF0FD" },
+                { title: "Registered Medicines", value: stats.registeredMedicines, icon: Pill, color: "#0284C7", bg: "#F0F9FF" },
                 { title: "Active Transfers", value: stats.activeTransfers, icon: Truck, color: "#0891B2", bg: "#ECFEFF" },
                 { title: "DrugChain Blocks", value: chainBlocks.length, icon: ShieldCheck, color: "#10B981", bg: "#ECFDF5" },
               ].map((card, i) => {
@@ -452,21 +531,21 @@ export default function Creator() {
                     onClick={card.onClick}
                     style={{
                       background: "#FFFFFF",
-                      border: "1px solid #E8EAF6",
+                      border: "1px solid #E2E8F0",
                       borderRadius: 18,
                       padding: "20px",
-                      boxShadow: "0 2px 10px rgba(0,0,0,0.02)",
+                      boxShadow: "0 2px 10px rgba(15,23,42,0.02)",
                       cursor: card.onClick ? "pointer" : "default",
                       transition: "transform 0.2s",
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                      <span style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", color: "#8E8FA8" }}>{card.title}</span>
+                      <span style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", color: "#64748B" }}>{card.title}</span>
                       <div style={{ width: 36, height: 36, borderRadius: 10, background: card.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <Icon size={18} color={card.color} />
                       </div>
                     </div>
-                    <div style={{ fontSize: 28, fontWeight: 800, color: "#18182E" }}>{card.value}</div>
+                    <div style={{ fontSize: 28, fontWeight: 800, color: "#0F172A" }}>{card.value}</div>
                   </div>
                 );
               })}
@@ -476,10 +555,10 @@ export default function Creator() {
             <div style={{ marginTop: 28, marginBottom: 32 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
                 <div>
-                  <h3 style={{ fontSize: 16, fontWeight: 800, color: "#18182E", margin: 0 }}>
+                  <h3 style={{ fontSize: 16, fontWeight: 800, color: "#0F172A", margin: 0 }}>
                     Registration Approval Queues by Role
                   </h3>
-                  <p style={{ fontSize: 12, color: "#5F607A", margin: "4px 0 0" }}>
+                  <p style={{ fontSize: 12, color: "#64748B", margin: "4px 0 0" }}>
                     Select a supply-chain tier to review applicant identity proofs, license credentials, and documents
                   </p>
                 </div>
@@ -505,30 +584,30 @@ export default function Creator() {
                   }}
                   style={{
                     background: "#FFFFFF",
-                    border: "1.5px solid #EEF0FD",
+                    border: "1.5px solid #E2E8F0",
                     borderRadius: 18,
                     padding: "20px",
                     cursor: "pointer",
                     transition: "all 0.2s ease",
-                    boxShadow: "0 2px 10px rgba(88, 85, 243, 0.05)",
+                    boxShadow: "0 2px 10px rgba(2, 132, 199, 0.05)",
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{ width: 38, height: 38, borderRadius: 10, background: "#EEF0FD", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <Building2 size={20} color="#5855F3" />
+                      <div style={{ width: 38, height: 38, borderRadius: 10, background: "#F0F9FF", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Building2 size={20} color="#0284C7" />
                       </div>
                       <div>
-                        <div style={{ fontSize: 14, fontWeight: 800, color: "#18182E" }}>Manufacturers</div>
-                        <div style={{ fontSize: 11, color: "#5F607A" }}>Drug Origin & Batch Creation</div>
+                        <div style={{ fontSize: 14, fontWeight: 800, color: "#0F172A" }}>Manufacturers</div>
+                        <div style={{ fontSize: 11, color: "#64748B" }}>Drug Origin & Batch Creation</div>
                       </div>
                     </div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14 }}>
-                    <span style={{ fontSize: 24, fontWeight: 800, color: "#5855F3" }}>
+                    <span style={{ fontSize: 24, fontWeight: 800, color: "#0284C7" }}>
                       {pendingList.filter((u) => u.role === "Manufacturer").length}
                     </span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "#5855F3", display: "flex", alignItems: "center", gap: 4 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#0284C7", display: "flex", alignItems: "center", gap: 4 }}>
                       Review Queue <ArrowRight size={14} />
                     </span>
                   </div>
@@ -678,16 +757,16 @@ export default function Creator() {
                   label: "All Applications",
                   icon: Layers,
                   count: pendingList.length,
-                  color: "#5855F3",
-                  bg: "#EEF0FD",
+                  color: "#0284C7",
+                  bg: "#F0F9FF",
                 },
                 {
                   id: "Manufacturer",
                   label: "Manufacturers",
                   icon: Building2,
                   count: pendingList.filter((u) => u.role === "Manufacturer").length,
-                  color: "#5855F3",
-                  bg: "#EEF0FD",
+                  color: "#0284C7",
+                  bg: "#F0F9FF",
                 },
                 {
                   id: "Distributor",
@@ -795,14 +874,14 @@ export default function Creator() {
                   size={20}
                   color={
                     approvalRoleTab === "Manufacturer"
-                      ? "#5855F3"
+                      ? "#0284C7"
                       : approvalRoleTab === "Distributor"
-                      ? "#7C3AED"
+                      ? "#0D9488"
                       : approvalRoleTab === "Pharmacy"
                       ? "#059669"
                       : approvalRoleTab === "Customer"
                       ? "#D97706"
-                      : "#5855F3"
+                      : "#0284C7"
                   }
                 />
                 <div style={{ fontSize: 13, color: "#18182E", fontWeight: 700 }}>
@@ -1103,10 +1182,17 @@ export default function Creator() {
                             </span>
                           </td>
                           <td style={{ padding: "16px 24px" }}>
-                            {usr.role !== "Customer" && usr.accountStatus === "APPROVED" ? (
+                            {usr.role !== "Customer" && ["APPROVED", "REJECTED"].includes(usr.accountStatus) ? (
                               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                <span style={{ fontSize: 13, fontWeight: 700, color: usr.credentialEmailStatus === "SENT" ? "#047857" : "#B45309" }}>
-                                  {usr.credentialEmailStatus === "SENT" ? "✓ Credentials Sent" : "⚠ Email Pending"}
+                                <span style={{
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  color:
+                                    usr.emailNotificationStatus === "SENT" ? "#047857" :
+                                    usr.emailNotificationStatus === "FAILED" ? "#B45309" : "#94A3B8",
+                                }}>
+                                  {usr.emailNotificationStatus === "SENT" ? "✓ Notified" :
+                                   usr.emailNotificationStatus === "FAILED" ? "⚠ Email Failed" : "— Not Sent"}
                                 </span>
                               </div>
                             ) : (
@@ -1114,27 +1200,53 @@ export default function Creator() {
                             )}
                           </td>
                           <td style={{ padding: "16px 24px", textAlign: "right" }}>
-                            {usr.accountStatus === "APPROVED" && usr.role !== "Customer" && (
-                              <button
-                                onClick={() => handleResendCredentials(usr._id, usr.name)}
-                                style={{
-                                  padding: "8px 16px",
-                                  borderRadius: 10,
-                                  border: "1px solid #C7D2FE",
-                                  background: "#EEF2FF",
-                                  color: "#4338CA",
-                                  fontSize: 12.5,
-                                  fontWeight: 800,
-                                  cursor: "pointer",
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: 6,
-                                  transition: "all 0.15s",
-                                }}
-                              >
-                                <Send size={13} /> Resend Credentials
-                              </button>
-                            )}
+                            <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                              {/* Resend Notification — for APPROVED or REJECTED non-Customer when email failed or not sent */}
+                              {usr.role !== "Customer" && ["APPROVED", "REJECTED"].includes(usr.accountStatus) &&
+                               usr.emailNotificationStatus !== "SENT" && (
+                                <button
+                                  onClick={() => handleResendNotification(usr._id, usr.name)}
+                                  title="Resend approval/rejection notification email"
+                                  style={{
+                                    padding: "7px 13px",
+                                    borderRadius: 8,
+                                    border: "1px solid #FCD34D",
+                                    background: "#FFFBEB",
+                                    color: "#92400E",
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    cursor: "pointer",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 5,
+                                  }}
+                                >
+                                  📧 Resend Notification
+                                </button>
+                              )}
+                              {/* Resend Credentials — APPROVED non-Customer only */}
+                              {usr.accountStatus === "APPROVED" && usr.role !== "Customer" && (
+                                <button
+                                  onClick={() => handleResendCredentials(usr._id, usr.name)}
+                                  style={{
+                                    padding: "8px 16px",
+                                    borderRadius: 10,
+                                    border: "1px solid #C7D2FE",
+                                    background: "#EEF2FF",
+                                    color: "#4338CA",
+                                    fontSize: 12.5,
+                                    fontWeight: 800,
+                                    cursor: "pointer",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 6,
+                                    transition: "all 0.15s",
+                                  }}
+                                >
+                                  <Send size={13} /> Resend Credentials
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1175,7 +1287,7 @@ export default function Creator() {
                     {medicinesList.map((med) => (
                       <tr key={med._id} style={{ borderBottom: "1px solid #F1F3FC" }}>
                         <td style={{ padding: "14px 20px", fontWeight: 800, color: "#18182E", fontSize: 13 }}>{med.name}</td>
-                        <td style={{ padding: "14px 20px", fontFamily: "monospace", color: "#5855F3", fontWeight: 700, fontSize: 12 }}>{med.batchId}</td>
+                        <td style={{ padding: "14px 20px", fontFamily: "monospace", color: "#0284C7", fontWeight: 700, fontSize: 12 }}>{med.batchId}</td>
                         <td style={{ padding: "14px 20px", fontSize: 12, color: "#5F607A" }}>{med.companyName || med.manufacturer}</td>
                         <td style={{ padding: "14px 20px", fontSize: 12, color: "#5F607A" }}>{med.expiryDate}</td>
                         <td style={{ padding: "14px 20px", fontFamily: "monospace", fontSize: 11, color: "#8E8FA8" }}>
@@ -1225,7 +1337,7 @@ export default function Creator() {
                         <td style={{ padding: "14px 20px", fontFamily: "monospace", fontWeight: 700, color: "#18182E", fontSize: 12 }}>{tr.id}</td>
                         <td style={{ padding: "14px 20px" }}>
                           <div style={{ fontWeight: 800, color: "#18182E", fontSize: 13 }}>{tr.medicineName}</div>
-                          <div style={{ fontSize: 11, color: "#5855F3", fontFamily: "monospace" }}>Batch: {tr.batchId}</div>
+                          <div style={{ fontSize: 11, color: "#0284C7", fontFamily: "monospace" }}>Batch: {tr.batchId}</div>
                         </td>
                         <td style={{ padding: "14px 20px", fontSize: 12, color: "#5F607A" }}>{tr.from}</td>
                         <td style={{ padding: "14px 20px", fontSize: 12, color: "#18182E", fontWeight: 700 }}>{tr.to}</td>
@@ -1313,7 +1425,7 @@ export default function Creator() {
                 >
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: 12, fontWeight: 800, background: "#EEF0FD", color: "#5855F3", padding: "3px 8px", borderRadius: 6 }}>
+                      <span style={{ fontSize: 12, fontWeight: 800, background: "#F0F9FF", color: "#0284C7", padding: "3px 8px", borderRadius: 6 }}>
                         Block #{blk.index}
                       </span>
                       <span style={{ fontSize: 12, color: "#8E8FA8" }}>{new Date(blk.timestamp).toLocaleString("en-IN")}</span>
@@ -1344,7 +1456,8 @@ export default function Creator() {
             left: 0,
             right: 0,
             bottom: 0,
-            background: "rgba(0,0,0,0.65)",
+            background: "rgba(15,23,42,0.65)",
+            backdropFilter: "blur(4px)",
             zIndex: 1000,
             display: "flex",
             alignItems: "center",
@@ -1361,21 +1474,22 @@ export default function Creator() {
               maxHeight: "92vh",
               overflowY: "auto",
               padding: "28px 32px",
-              boxShadow: "0 24px 70px rgba(0,0,0,0.25)",
+              boxShadow: "0 24px 70px rgba(15,23,42,0.25)",
+              border: "1px solid #E2E8F0",
             }}
           >
             {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, borderBottom: "1px solid #E8EAF6", paddingBottom: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, borderBottom: "1px solid #E2E8F0", paddingBottom: 16 }}>
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <h2 style={{ fontSize: 20, fontWeight: 800, color: "#18182E", margin: 0 }}>
+                  <h2 style={{ fontSize: 20, fontWeight: 800, color: "#0F172A", margin: 0 }}>
                     {selectedCandidate.fullName || selectedCandidate.name}
                   </h2>
-                  <span style={{ fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 100, background: "#EEF0FD", color: "#5855F3", textTransform: "uppercase" }}>
+                  <span style={{ fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 100, background: "#F0F9FF", color: "#0284C7", textTransform: "uppercase" }}>
                     {selectedCandidate.role}
                   </span>
                 </div>
-                <div style={{ fontSize: 13, color: "#5F607A", marginTop: 2 }}>
+                <div style={{ fontSize: 13, color: "#64748B", marginTop: 2 }}>
                   Application submitted on {new Date(selectedCandidate.createdAt).toLocaleString("en-IN")}
                 </div>
               </div>
@@ -1383,7 +1497,7 @@ export default function Creator() {
               <button
                 type="button"
                 onClick={() => setSelectedCandidate(null)}
-                style={{ background: "none", border: "none", cursor: "pointer", color: "#8E8FA8" }}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}
               >
                 <X size={24} />
               </button>
@@ -1391,8 +1505,8 @@ export default function Creator() {
 
             {/* Candidate Identity Details Grid */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
-              <div style={{ background: "#F8F9FE", borderRadius: 12, padding: "16px" }}>
-                <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: "#8E8FA8", marginBottom: 8 }}>
+              <div style={{ background: "#F8FAFC", borderRadius: 12, padding: "16px", border: "1px solid #E2E8F0" }}>
+                <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: "#64748B", marginBottom: 8 }}>
                   Personal Information
                 </div>
                 <div style={{ display: "grid", gap: 6, fontSize: 13 }}>
@@ -1402,8 +1516,8 @@ export default function Creator() {
                 </div>
               </div>
 
-              <div style={{ background: "#F8F9FE", borderRadius: 12, padding: "16px" }}>
-                <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: "#8E8FA8", marginBottom: 8 }}>
+              <div style={{ background: "#F8FAFC", borderRadius: 12, padding: "16px", border: "1px solid #E2E8F0" }}>
+                <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: "#64748B", marginBottom: 8 }}>
                   Organization Credentials
                 </div>
                 <div style={{ display: "grid", gap: 6, fontSize: 13 }}>
@@ -1416,27 +1530,27 @@ export default function Creator() {
 
             {/* Submitted Identity Documents Section */}
             <div style={{ marginBottom: 24 }}>
-              <div style={{ fontSize: 14, fontWeight: 800, color: "#18182E", marginBottom: 12 }}>
+              <div style={{ fontSize: 14, fontWeight: 800, color: "#0F172A", marginBottom: 12 }}>
                 Submitted Identity Documents & Proofs
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                 {/* 1. Identity Photo Box */}
-                <div style={{ border: "1px solid #E8EAF6", borderRadius: 14, padding: "16px", textAlign: "center" }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: "#18182E", marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                    <Camera size={14} color="#5855F3" /> Live Identity Photo
+                <div style={{ border: "1px solid #E2E8F0", borderRadius: 14, padding: "16px", textAlign: "center" }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: "#0F172A", marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                    <Camera size={14} color="#0284C7" /> Live Identity Photo
                   </div>
                   {selectedCandidate.identityPhoto ? (
                     <div>
                       <img
-                        src={`http://localhost:5000/api/creator/users/${selectedCandidate._id}/identity-photo?token=${currentAuthToken}`}
+                        src={`/api/creator/users/${selectedCandidate._id}/identity-photo?token=${currentAuthToken}`}
                         alt="Identity Photo"
-                        style={{ width: "100%", height: 180, objectFit: "cover", borderRadius: 10, border: "1px solid #E8EAF6", marginBottom: 8 }}
+                        style={{ width: "100%", height: 180, objectFit: "cover", borderRadius: 10, border: "1px solid #E2E8F0", marginBottom: 8 }}
                       />
                       <button
                         type="button"
-                        onClick={() => setZoomPhotoUrl(`http://localhost:5000/api/creator/users/${selectedCandidate._id}/identity-photo?token=${currentAuthToken}`)}
-                        style={{ background: "#EEF0FD", color: "#5855F3", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}
+                        onClick={() => setZoomPhotoUrl(`/api/creator/users/${selectedCandidate._id}/identity-photo?token=${currentAuthToken}`)}
+                        style={{ background: "#F0F9FF", color: "#0284C7", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}
                       >
                         <ZoomIn size={13} /> Zoom Photo
                       </button>
@@ -1447,18 +1561,18 @@ export default function Creator() {
                 </div>
 
                 {/* 2. Government ID Box */}
-                <div style={{ border: "1px solid #E8EAF6", borderRadius: 14, padding: "16px", textAlign: "center" }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: "#18182E", marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                    <FileText size={14} color="#5855F3" /> Government ID Proof
+                <div style={{ border: "1px solid #E2E8F0", borderRadius: 14, padding: "16px", textAlign: "center" }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: "#0F172A", marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                    <FileText size={14} color="#0284C7" /> Government ID Proof
                   </div>
                   {selectedCandidate.governmentId ? (
                     <div>
                       <div
                         style={{
                           height: 180,
-                          background: "#F8F9FE",
+                          background: "#F8FAFC",
                           borderRadius: 10,
-                          border: "1px solid #E8EAF6",
+                          border: "1px solid #E2E8F0",
                           display: "flex",
                           flexDirection: "column",
                           alignItems: "center",
@@ -1466,19 +1580,19 @@ export default function Creator() {
                           marginBottom: 8,
                         }}
                       >
-                        <FileCheck size={36} color="#5855F3" style={{ marginBottom: 6 }} />
-                        <div style={{ fontSize: 12, fontWeight: 700, color: "#18182E" }}>
+                        <FileCheck size={36} color="#0284C7" style={{ marginBottom: 6 }} />
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "#0F172A" }}>
                           {selectedCandidate.governmentIdType || "Government ID Document"}
                         </div>
-                        <div style={{ fontSize: 11, color: "#8E8FA8" }}>Stored in Protected Storage</div>
+                        <div style={{ fontSize: 11, color: "#64748B" }}>Stored in Protected Storage</div>
                       </div>
 
                       <a
-                        href={`http://localhost:5000/api/creator/users/${selectedCandidate._id}/government-id?token=${currentAuthToken}`}
+                        href={`/api/creator/users/${selectedCandidate._id}/government-id?token=${currentAuthToken}`}
                         target="_blank"
                         rel="noreferrer"
                         style={{
-                          background: "#5855F3",
+                          background: "#0284C7",
                           color: "#FFFFFF",
                           borderRadius: 8,
                           padding: "6px 14px",
@@ -1597,6 +1711,234 @@ export default function Creator() {
           </div>
         </div>
       )}
+
+        {/* ── VIEW 7: SECURITY ALERTS (ADMIN / CREATOR ONLY) ── */}
+        {activeTab === "security-alerts" && (
+          <div>
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 10, background: "#FEF2F2", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <BellRing size={20} color="#DC2626" />
+                  </div>
+                  <h1 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: "1.6rem", fontWeight: 800, color: "#18182E", margin: 0 }}>
+                    Danger Alert Console
+                  </h1>
+                </div>
+                <p style={{ fontSize: 13, color: "#5F607A", margin: 0 }}>
+                  Automated risk signals from manufacturer and medicine registrations. <strong style={{ color: "#DC2626" }}>Visible to Admin only.</strong> Submitters see only safe status messages.
+                </p>
+              </div>
+              <button
+                onClick={() => fetchSecurityAlerts(alertFilters)}
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 16px", borderRadius: 10, border: "1px solid #E8EAF6", background: "#FFFFFF", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+              >
+                <RefreshCw size={14} /> Refresh
+              </button>
+            </div>
+
+            {/* Summary Badges */}
+            <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
+              {[
+                { label: "Open Alerts", value: alertStats.openCount, color: "#DC2626", bg: "#FEF2F2", border: "#FECACA" },
+                { label: "Critical", value: alertStats.criticalCount, color: "#7C2D12", bg: "#FFF7ED", border: "#FED7AA" },
+                { label: "High Risk", value: alertStats.highCount, color: "#D97706", bg: "#FFFBEB", border: "#FDE68A" },
+              ].map((b) => (
+                <div key={b.label} style={{ padding: "12px 20px", borderRadius: 12, background: b.bg, border: `1px solid ${b.border}` }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: b.color, textTransform: "uppercase", letterSpacing: 0.5 }}>{b.label}</div>
+                  <div style={{ fontSize: 26, fontWeight: 800, color: b.color }}>{b.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Filters */}
+            <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
+              {[
+                { key: "status", options: ["ALL", "OPEN", "REVIEWED", "DISMISSED", "ESCALATED"] },
+                { key: "severity", options: ["ALL", "CRITICAL", "HIGH", "MEDIUM", "LOW"] },
+                { key: "sourceType", options: ["ALL", "MANUFACTURER_REGISTRATION", "MEDICINE_REGISTRATION"] },
+              ].map(({ key, options }) => (
+                <select
+                  key={key}
+                  value={alertFilters[key]}
+                  onChange={(e) => {
+                    const newFilters = { ...alertFilters, [key]: e.target.value };
+                    setAlertFilters(newFilters);
+                    fetchSecurityAlerts(newFilters);
+                  }}
+                  style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #E8EAF6", fontSize: 12, fontWeight: 700, background: "#FFFFFF", cursor: "pointer" }}
+                >
+                  {options.map((o) => <option key={o} value={o}>{key === "sourceType" ? o.replace(/_/g, " ") : o}</option>)}
+                </select>
+              ))}
+            </div>
+
+            {/* Alert Cards */}
+            {alertsLoading ? (
+              <div style={{ textAlign: "center", padding: 60, color: "#8E8FA8" }}>
+                <Loader2 size={32} style={{ animation: "spin 1s linear infinite", marginBottom: 8 }} />
+                <div style={{ fontSize: 13 }}>Loading security alerts...</div>
+              </div>
+            ) : securityAlerts.length === 0 ? (
+              <div style={{ textAlign: "center", padding: 60, background: "#F8FAFC", borderRadius: 18, border: "1px solid #E8EAF6" }}>
+                <ShieldCheck size={40} color="#10B981" style={{ marginBottom: 12 }} />
+                <div style={{ fontSize: 16, fontWeight: 800, color: "#18182E", marginBottom: 6 }}>No Alerts Found</div>
+                <div style={{ fontSize: 13, color: "#5F607A" }}>No suspicious submissions match the current filters.</div>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {securityAlerts.map((alert) => {
+                  const isExpanded = expandedAlertId === alert._id;
+                  const isReviewing = reviewingAlertId === alert._id;
+
+                  const sevColor = {
+                    CRITICAL: { text: "#7C2D12", bg: "#FFF7ED", border: "#FED7AA", dot: "#DC2626" },
+                    HIGH:     { text: "#92400E", bg: "#FFFBEB", border: "#FDE68A", dot: "#D97706" },
+                    MEDIUM:   { text: "#1E3A8A", bg: "#EFF6FF", border: "#BFDBFE", dot: "#2563EB" },
+                    LOW:      { text: "#065F46", bg: "#ECFDF5", border: "#A7F3D0", dot: "#10B981" },
+                  }[alert.severity] || { text: "#5F607A", bg: "#F8FAFC", border: "#E8EAF6", dot: "#8E8FA8" };
+
+                  const stColor = alert.status === "OPEN" ? "#DC2626" : alert.status === "ESCALATED" ? "#7C3AED" : "#6B7280";
+
+                  return (
+                    <div
+                      key={alert._id}
+                      style={{ background: "#FFFFFF", border: `1px solid ${isExpanded ? sevColor.border : "#E8EAF6"}`, borderRadius: 16, overflow: "hidden", transition: "all 0.2s" }}
+                    >
+                      {/* Card Header */}
+                      <div
+                        onClick={() => setExpandedAlertId(isExpanded ? null : alert._id)}
+                        style={{ display: "flex", alignItems: "center", gap: 14, padding: "16px 20px", cursor: "pointer" }}
+                      >
+                        <div style={{ width: 10, height: 10, borderRadius: "50%", background: sevColor.dot, flexShrink: 0 }} />
+
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                            <span style={{ fontSize: 14, fontWeight: 800, color: "#18182E" }}>{alert.title}</span>
+                            <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 100, background: sevColor.bg, color: sevColor.text, border: `1px solid ${sevColor.border}` }}>
+                              {alert.severity}
+                            </span>
+                            <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 100, background: "#F1F5F9", color: stColor }}>
+                              {alert.status}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 12, color: "#5F607A", marginTop: 2 }}>
+                            <strong>{alert.submittedByName || alert.submittedByEmail}</strong>
+                            {" · "}{alert.submittedByEmail}
+                            {" · "}{alert.submittedByRole}
+                            {" · "}{new Date(alert.createdAt).toLocaleString("en-IN")}
+                          </div>
+                        </div>
+
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 12, fontWeight: 800, color: sevColor.text, background: sevColor.bg, padding: "4px 10px", borderRadius: 8 }}>
+                            Risk: {alert.riskScore}/100
+                          </span>
+                          {isExpanded ? <ChevronDown size={16} color="#8E8FA8" /> : <ChevronRight size={16} color="#8E8FA8" />}
+                        </div>
+                      </div>
+
+                      {/* Expanded Detail */}
+                      {isExpanded && (
+                        <div style={{ borderTop: `1px solid ${sevColor.border}`, padding: "16px 20px", background: sevColor.bg }}>
+                          <div style={{ fontSize: 12, color: "#5F607A", marginBottom: 12 }}>{alert.description}</div>
+
+                          {/* Risk Flags */}
+                          <div style={{ marginBottom: 16 }}>
+                            <div style={{ fontSize: 12, fontWeight: 800, color: "#18182E", marginBottom: 8, textTransform: "uppercase" }}>Risk Signals Detected</div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                              {(alert.riskFlags || []).map((flag, fi) => (
+                                <div key={fi} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 12px", background: "#FFFFFF", borderRadius: 8, border: `1px solid ${sevColor.border}` }}>
+                                  <TriangleAlert size={14} color={sevColor.dot} style={{ flexShrink: 0, marginTop: 1 }} />
+                                  <span style={{ fontSize: 12, color: "#374151" }}>{flag}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Meta info */}
+                          <div style={{ display: "flex", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
+                            <div style={{ fontSize: 11, color: "#5F607A" }}><strong>Source:</strong> {alert.sourceType?.replace(/_/g, " ")}</div>
+                            <div style={{ fontSize: 11, color: "#5F607A" }}><strong>Resource:</strong> {alert.relatedResourceType} — {alert.relatedResourceId}</div>
+                            {alert.reviewedBy && (
+                              <div style={{ fontSize: 11, color: "#5F607A" }}><strong>Reviewed by:</strong> {alert.reviewedBy} at {new Date(alert.reviewedAt).toLocaleString("en-IN")}</div>
+                            )}
+                            {alert.reviewNote && (
+                              <div style={{ fontSize: 11, color: "#374151" }}><strong>Note:</strong> {alert.reviewNote}</div>
+                            )}
+                          </div>
+
+                          {/* Actions */}
+                          {alert.status === "OPEN" && (
+                            <div>
+                              {isReviewing ? (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                  <textarea
+                                    value={reviewNote}
+                                    onChange={(e) => setReviewNote(e.target.value)}
+                                    placeholder="Add a review note (optional)..."
+                                    rows={2}
+                                    style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #D1D5DB", fontSize: 12, resize: "none", width: "100%", boxSizing: "border-box" }}
+                                  />
+                                  <div style={{ display: "flex", gap: 8 }}>
+                                    {["REVIEWED", "DISMISSED", "ESCALATED"].map((action) => (
+                                      <button
+                                        key={action}
+                                        onClick={async () => {
+                                          try {
+                                            await api.patch(`/security-alerts/${alert._id}/review`, { action, note: reviewNote });
+                                            toast.success(`Alert marked as ${action}`);
+                                            setReviewingAlertId(null);
+                                            setReviewNote("");
+                                            setExpandedAlertId(null);
+                                            fetchSecurityAlerts(alertFilters);
+                                            fetchData();
+                                          } catch (err) {
+                                            toast.error(err.message || "Action failed");
+                                          }
+                                        }}
+                                        style={{
+                                          padding: "8px 14px",
+                                          borderRadius: 8,
+                                          border: "none",
+                                          fontWeight: 700,
+                                          fontSize: 12,
+                                          cursor: "pointer",
+                                          background: action === "ESCALATED" ? "#7C3AED" : action === "DISMISSED" ? "#6B7280" : "#059669",
+                                          color: "#FFFFFF",
+                                        }}
+                                      >
+                                        {action}
+                                      </button>
+                                    ))}
+                                    <button
+                                      onClick={() => { setReviewingAlertId(null); setReviewNote(""); }}
+                                      style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid #E8EAF6", background: "#FFFFFF", fontWeight: 700, fontSize: 12, cursor: "pointer" }}
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => setReviewingAlertId(alert._id)}
+                                  style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, background: "#18182E", color: "#FFFFFF", border: "none", fontWeight: 700, fontSize: 12, cursor: "pointer" }}
+                                >
+                                  <Eye size={13} /> Review This Alert
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
       {/* ── APPROVAL CONFIRMATION MODAL ── */}
       {confirmApproveUser && (

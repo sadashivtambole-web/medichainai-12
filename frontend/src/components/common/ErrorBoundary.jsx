@@ -46,7 +46,7 @@ export default class ErrorBoundary extends React.Component {
                 width: 56,
                 height: 56,
                 borderRadius: 16,
-                background: "linear-gradient(135deg, #5855F3, #4743EB)",
+                background: "linear-gradient(135deg, #0284C7, #0369A1)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -57,10 +57,10 @@ export default class ErrorBoundary extends React.Component {
               <Shield size={28} />
             </div>
 
-            <h2 style={{ fontSize: 20, fontWeight: 800, color: "#18182E", marginBottom: 8 }}>
-              Fake Drug Detection Platform
+            <h2 style={{ fontSize: 20, fontWeight: 800, color: "#0F172A", marginBottom: 8 }}>
+              MediChainAI Verification Platform
             </h2>
-            <p style={{ fontSize: 13, color: "#5F607A", lineHeight: 1.5, marginBottom: 24 }}>
+            <p style={{ fontSize: 13, color: "#64748B", lineHeight: 1.5, marginBottom: 24 }}>
               The application encountered a transient interface state. Click below to reload the dashboard.
             </p>
 
@@ -73,7 +73,7 @@ export default class ErrorBoundary extends React.Component {
                 style={{
                   padding: "11px 20px",
                   borderRadius: 10,
-                  border: "1px solid #E8EAF6",
+                  border: "1px solid #E2E8F0",
                   background: "#FFFFFF",
                   fontSize: 13,
                   fontWeight: 700,
@@ -91,7 +91,7 @@ export default class ErrorBoundary extends React.Component {
                   padding: "11px 24px",
                   borderRadius: 10,
                   border: "none",
-                  background: "#5855F3",
+                  background: "#0284C7",
                   color: "white",
                   fontSize: 13,
                   fontWeight: 800,

@@ -29,8 +29,23 @@ export class DrugChainService {
       throw new Error("Registration requires medicineId, batchNumber, and medicineName");
     }
 
-    if (this.blockchain.isMedicineRegistered(medicineId, batchNumber)) {
-      throw new Error(`Medicine '${medicineId}' / Batch '${batchNumber}' is already registered on DrugChain`);
+    // Check if already registered — return existing record instead of throwing
+    const existingRecord = this.blockchain.getRegistrationRecord(medicineId, batchNumber);
+    if (existingRecord) {
+      return {
+        success: true,
+        alreadyExists: true,
+        medicineId: existingRecord.medicineId,
+        batchNumber: existingRecord.batchNumber,
+        transactionId: existingRecord.transactionId,
+        dataHash: existingRecord.dataHash,
+        blockIndex: existingRecord.blockIndex,
+        blockHash: existingRecord.blockHash,
+        previousHash: null,
+        timestamp: existingRecord.timestamp,
+        validator: existingRecord.validator,
+        metadata: existingRecord.metadata,
+      };
     }
 
     // 1. Calculate deterministic medicine data hash
@@ -283,6 +298,26 @@ export class DrugChainService {
    */
   getMedicineHistory(medicineId) {
     return this.blockchain.getTransactionsForMedicine(medicineId);
+  }
+
+  /**
+   * Check if a batch is already registered on chain
+   * @param {string} medicineId
+   * @param {string} batchNumber
+   * @returns {boolean}
+   */
+  isBatchRegistered(medicineId, batchNumber) {
+    return this.blockchain.isMedicineRegistered(medicineId, batchNumber);
+  }
+
+  /**
+   * Get full on-chain registration record for an existing batch
+   * @param {string} medicineId
+   * @param {string} batchNumber
+   * @returns {Object|null}
+   */
+  getRegistrationRecord(medicineId, batchNumber) {
+    return this.blockchain.getRegistrationRecord(medicineId, batchNumber);
   }
 
   /**

@@ -1,0 +1,28 @@
+[
+  {
+    "index": 0,
+    "timestamp": "2024-01-01T00:00:00.000Z",
+    "transactions": [
+      {
+        "transactionId": "tx-genesis-0000000000000000",
+        "type": "MEDICINE_REGISTERED",
+        "medicineId": "GENESIS-DRUGCHAIN-ROOT",
+        "batchNumber": "GENESIS-BATCH-000",
+        "from": null,
+        "to": "DrugChain Network Authority",
+        "timestamp": "2024-01-01T00:00:00.000Z",
+        "dataHash": "3e8d1d5dbe42a78891fbee062048e806d8d142563f08f620929e89bd845ebacf",
+        "metadata": {
+          "network": "DrugChain Private Permissioned Network",
+          "consensus": "Proof of Authority (PoA)",
+          "purpose": "Immutable Pharmaceutical Traceability & Anti-Counterfeit Ledger"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "hash": "ebb09faaccac2dd81ee3dd2f2e84bc4a8e1256376a24b2fba9363e103113c6a5",
+    "merkleRoot": "4b1e4c667556b8006795add77bbc658042405ee2bedfe246f710cf86699a255d",
+    "validator": "genesis-authority"
+  }
+]

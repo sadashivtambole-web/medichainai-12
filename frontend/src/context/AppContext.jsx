@@ -86,6 +86,31 @@ export function AppProvider({ children }) {
 
   const login = async (email, password) => {
     const res = await authService.login(email, password);
+    if (res.success) {
+      if (res.data?.requiresOtp || res.requiresOtp) {
+        return {
+          requiresOtp: true,
+          email: res.data?.email || email,
+          maskedEmail: res.data?.maskedEmail,
+          loginSessionToken: res.data?.loginSessionToken,
+          purpose: res.data?.purpose || "LOGIN",
+          role: res.data?.role,
+        };
+      }
+      if (res.data?.user) {
+        setUser(res.data.user);
+        setToken(res.data.token);
+        return {
+          user: res.data.user,
+          mustChangePassword: !!res.data.mustChangePassword,
+        };
+      }
+    }
+    throw new Error(res.message || "Login failed");
+  };
+
+  const verifyLoginOtp = async (email, otp, loginSessionToken) => {
+    const res = await authService.verifyLoginOtp(email, otp, loginSessionToken);
     if (res.success && res.data?.user) {
       setUser(res.data.user);
       setToken(res.data.token);
@@ -94,7 +119,7 @@ export function AppProvider({ children }) {
         mustChangePassword: !!res.data.mustChangePassword,
       };
     }
-    throw new Error(res.message || "Login failed");
+    throw new Error(res.message || "Verification failed");
   };
 
   const registerUser = async (userData) => {
@@ -115,16 +140,19 @@ export function AppProvider({ children }) {
 
   /* ── Manufacturer Action: Register Medicine on Real Backend ── */
   const registerMedicine = async (medicineData) => {
+    // medicineService throws a typed error with .alreadyRegistered = true for duplicate batches.
+    // Let it propagate directly so Manufacturer.jsx can inspect error.alreadyRegistered.
     const saved = await medicineService.registerMedicine({
       ...medicineData,
-      manufacturerName: medicineData.manufacturerName || user.name,
-      companyName: medicineData.companyName || user.company,
-      manufacturerCode: medicineData.manufacturerCode || user.companyCode,
+      manufacturerName: medicineData.manufacturerName || user?.name,
+      companyName: medicineData.companyName || user?.company,
+      manufacturerCode: medicineData.manufacturerCode || user?.companyCode,
     });
 
     if (saved) {
-      setMedicines((prev) => [saved, ...prev.filter((m) => m.id !== saved.id)]);
-      // Refresh transfers
+      // Prepend new medicine to local list (avoid duplicates)
+      setMedicines((prev) => [saved, ...prev.filter((m) => m.id !== saved.id && m.batchId !== saved.batchId)]);
+      // Refresh transfers to show the new pending distributor transfer
       try {
         const trans = await transferService.getIncomingTransfers();
         setTransfers(trans);
@@ -133,6 +161,7 @@ export function AppProvider({ children }) {
     }
     throw new Error("Failed to register medicine on server");
   };
+
 
   /* ── Distributor Action: Confirm Received on Real Backend ── */
   const confirmTransfer = async (transferId) => {
@@ -193,6 +222,7 @@ export function AppProvider({ children }) {
         setUser,
         token,
         login,
+        verifyLoginOtp,
         registerUser,
         logout,
         medicines,

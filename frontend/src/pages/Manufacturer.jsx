@@ -7,6 +7,7 @@ import FileUpload from "../components/forms/FileUpload";
 import AIVerificationPanel from "../components/forms/AIVerificationPanel";
 import QRDisplay from "../components/ui/QRDisplay";
 import BlockchainStatus from "../components/ui/BlockchainStatus";
+import MedicineImage, { resolveMedicineImageUrl } from "../components/ui/MedicineImage";
 import { useApp } from "../context/AppContext";
 import toast, { Toaster } from "react-hot-toast";
 
@@ -18,6 +19,7 @@ export default function Manufacturer() {
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [registered, setRegistered] = useState(null);
+  const [alreadyRegistered, setAlreadyRegistered] = useState(null); // holds existing record if duplicate
   const [searchQuery, setSearchQuery] = useState("");
 
   const [form, setForm] = useState({
@@ -97,6 +99,7 @@ export default function Manufacturer() {
     }
 
     setSubmitting(true);
+    setAlreadyRegistered(null);
     try {
       const result = await registerMedicine({
         ...form,
@@ -106,11 +109,21 @@ export default function Manufacturer() {
       setRegistered(result);
       toast.success("Medicine registered successfully on blockchain & MongoDB!");
     } catch (err) {
-      toast.error(err.message || "Registration failed. Please check form values.");
+      // Handle "already registered" as an informational state, not an error
+      if (err.alreadyRegistered) {
+        setAlreadyRegistered(err.existingRecord || { batchId: form.batchNumber.trim().toUpperCase() });
+        toast(
+          `Batch '${form.batchNumber.trim().toUpperCase()}' is already on DrugChain. Showing existing record.`,
+          { icon: "⚠️", duration: 5000, style: { background: "#FFF7ED", color: "#92400E", border: "1px solid #F59E0B" } }
+        );
+      } else {
+        toast.error(err.message || "Registration failed. Please check form values.");
+      }
     } finally {
       setSubmitting(false);
     }
   };
+
 
   const inputStyle = {
     width: "100%",
@@ -162,11 +175,11 @@ export default function Manufacturer() {
                   value={form[key]}
                   onChange={set(key)}
                   onFocus={(e) => {
-                    e.target.style.borderColor = "#5855F3";
-                    e.target.style.boxShadow = "0 0 0 3px rgba(88,85,243,0.1)";
+                    e.target.style.borderColor = "#0284C7";
+                    e.target.style.boxShadow = "0 0 0 3px rgba(2,132,199,0.15)";
                   }}
                   onBlur={(e) => {
-                    e.target.style.borderColor = "#E8EAF6";
+                    e.target.style.borderColor = "#E2E8F0";
                     e.target.style.boxShadow = "none";
                   }}
                 />
@@ -196,11 +209,11 @@ export default function Manufacturer() {
                 value={form.medicineName}
                 onChange={set("medicineName")}
                 onFocus={(e) => {
-                  e.target.style.borderColor = "#5855F3";
-                  e.target.style.boxShadow = "0 0 0 3px rgba(88,85,243,0.1)";
+                  e.target.style.borderColor = "#0284C7";
+                  e.target.style.boxShadow = "0 0 0 3px rgba(2,132,199,0.12)";
                 }}
                 onBlur={(e) => {
-                  e.target.style.borderColor = "#E8EAF6";
+                  e.target.style.borderColor = "#E2E8F0";
                   e.target.style.boxShadow = "none";
                 }}
               />
@@ -214,11 +227,11 @@ export default function Manufacturer() {
                 value={form.batchNumber}
                 onChange={set("batchNumber")}
                 onFocus={(e) => {
-                  e.target.style.borderColor = "#5855F3";
-                  e.target.style.boxShadow = "0 0 0 3px rgba(88,85,243,0.1)";
+                  e.target.style.borderColor = "#0284C7";
+                  e.target.style.boxShadow = "0 0 0 3px rgba(2,132,199,0.12)";
                 }}
                 onBlur={(e) => {
-                  e.target.style.borderColor = "#E8EAF6";
+                  e.target.style.borderColor = "#E2E8F0";
                   e.target.style.boxShadow = "none";
                 }}
               />
@@ -232,11 +245,11 @@ export default function Manufacturer() {
                 value={form.price}
                 onChange={set("price")}
                 onFocus={(e) => {
-                  e.target.style.borderColor = "#5855F3";
-                  e.target.style.boxShadow = "0 0 0 3px rgba(88,85,243,0.1)";
+                  e.target.style.borderColor = "#0284C7";
+                  e.target.style.boxShadow = "0 0 0 3px rgba(2,132,199,0.12)";
                 }}
                 onBlur={(e) => {
-                  e.target.style.borderColor = "#E8EAF6";
+                  e.target.style.borderColor = "#E2E8F0";
                   e.target.style.boxShadow = "none";
                 }}
               />
@@ -374,13 +387,13 @@ export default function Manufacturer() {
               <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "#8E8FA8", marginBottom: 4 }}>QR / Barcode</div>
               <div style={{ fontSize: 13, fontWeight: 700, color: "#065F46" }}>✓ Generated</div>
             </div>
-            <div style={{ flex: 1, padding: "12px 16px", borderRadius: 12, background: "#EEF0FD", border: "1px solid rgba(88,85,243,0.3)" }}>
-              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "#8E8FA8", marginBottom: 4 }}>Blockchain</div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#5855F3" }}>🟢 Connected</div>
+            <div style={{ flex: 1, padding: "12px 16px", borderRadius: 12, background: "#F0F9FF", border: "1px solid rgba(2,132,199,0.3)" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "#64748B", marginBottom: 4 }}>Blockchain</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#0284C7" }}>🟢 Connected</div>
             </div>
-            <div style={{ flex: 1, padding: "12px 16px", borderRadius: 12, background: "#EEF0FD", border: "1px solid rgba(88,85,243,0.3)" }}>
-              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "#8E8FA8", marginBottom: 4 }}>AI Verification</div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#5855F3" }}>✓ Passed</div>
+            <div style={{ flex: 1, padding: "12px 16px", borderRadius: 12, background: "#F0FDFA", border: "1px solid rgba(13,148,136,0.3)" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "#64748B", marginBottom: 4 }}>AI Verification</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#0D9488" }}>✓ Passed</div>
             </div>
           </div>
         </div>
@@ -449,10 +462,10 @@ export default function Manufacturer() {
                     style={{ width: "100%", height: 180, objectFit: "cover", borderRadius: 8, border: "1px solid #E8EAF6" }}
                   />
                 ) : registered.medicineImage ? (
-                  <img
-                    src={`http://localhost:5000${registered.medicineImage}`}
-                    alt="Medicine Preview"
-                    style={{ width: "100%", height: 180, objectFit: "cover", borderRadius: 8, border: "1px solid #E8EAF6" }}
+                  <MedicineImage
+                    src={registered.medicineImage}
+                    alt={`${registered.name || "Medicine"} packaging`}
+                    style={{ height: 180 }}
                   />
                 ) : (
                   <div style={{ height: 100, display: "flex", alignItems: "center", justifyContent: "center", color: "#8E8FA8", fontSize: 12 }}>Image on file</div>
@@ -538,20 +551,20 @@ export default function Manufacturer() {
               width: 52,
               height: 52,
               borderRadius: 16,
-              background: "linear-gradient(135deg,#5855F3,#4743EB)",
+              background: "linear-gradient(135deg,#0284C7,#0369A1)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              boxShadow: "0 6px 20px rgba(88,85,243,0.25)",
+              boxShadow: "0 8px 24px rgba(2,132,199,0.25)",
             }}
           >
             <Factory size={26} color="white" />
           </div>
           <div>
-            <h1 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: "2rem", fontWeight: 800, color: "#18182E" }}>
+            <h1 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: "2rem", fontWeight: 800, color: "#0F172A" }}>
               Manufacturer
             </h1>
-            <p style={{ fontSize: 13, color: "#5F607A", marginTop: 2 }}>
+            <p style={{ fontSize: 13, color: "#64748B", marginTop: 2 }}>
               Register and manage verified medicines on blockchain
             </p>
           </div>
@@ -560,20 +573,20 @@ export default function Manufacturer() {
         {/* ── Stat Cards ── */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16, marginBottom: 36 }}>
           {[
-            { label: "My Medicines", value: medicines.length, color: "#6366F1", bg: "rgba(99,102,241,0.08)" },
-            { label: "Authenticated", value: medicines.filter(m => m.status === "AUTHENTIC").length, color: "#10B981", bg: "rgba(16,185,129,0.08)" },
-            { label: "Pending Transfer", value: medicines.filter(m => m.currentHolder === "Manufacturer").length, color: "#F59E0B", bg: "rgba(245,158,11,0.08)" },
-            { label: "At Pharmacy", value: medicines.filter(m => m.currentHolder === "Pharmacy").length, color: "#06B6D4", bg: "rgba(6,182,212,0.08)" },
+            { label: "My Medicines", value: medicines.length, color: "#0284C7", bg: "rgba(2,132,199,0.08)" },
+            { label: "Authenticated", value: medicines.filter(m => m.status === "AUTHENTIC").length, color: "#059669", bg: "rgba(5,150,105,0.08)" },
+            { label: "Pending Transfer", value: medicines.filter(m => m.currentHolder === "Manufacturer").length, color: "#D97706", bg: "rgba(217,119,6,0.08)" },
+            { label: "At Pharmacy", value: medicines.filter(m => m.currentHolder === "Pharmacy").length, color: "#0D9488", bg: "rgba(13,148,136,0.08)" },
           ].map(s => (
-            <div key={s.label} className="stat-card" style={{ padding: "20px 22px", transition: "all 0.3s ease" }}
-              onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 16px 40px rgba(99,102,241,0.10)"; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 4px 16px rgba(99,102,241,0.04)"; }}
+            <div key={s.label} className="med-card" style={{ padding: "20px 22px", transition: "all 0.3s ease" }}
+              onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 16px 36px rgba(2,132,199,0.12)"; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 2px 10px rgba(15,23,42,0.04)"; }}
             >
               <div style={{ width: 40, height: 40, borderRadius: 12, background: s.bg, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
                 <Package size={20} color={s.color} />
               </div>
               <div style={{ fontSize: 28, fontWeight: 800, color: s.color, fontFamily: "'Plus Jakarta Sans', sans-serif", lineHeight: 1 }}>{s.value}</div>
-              <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#94A3B8", marginTop: 4 }}>{s.label}</div>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#64748B", marginTop: 4 }}>{s.label}</div>
             </div>
           ))}
         </div>
@@ -588,15 +601,15 @@ export default function Manufacturer() {
                     width: 32,
                     height: 32,
                     borderRadius: "50%",
-                    background: i < step ? "#10B981" : i === step ? "#5855F3" : "#FFFFFF",
-                    border: `1px solid ${i < step ? "#10B981" : i === step ? "#5855F3" : "#E8EAF6"}`,
+                    background: i < step ? "#059669" : i === step ? "#0284C7" : "#FFFFFF",
+                    border: `1px solid ${i < step ? "#059669" : i === step ? "#0284C7" : "#E2E8F0"}`,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     fontSize: 12,
                     fontWeight: 800,
-                    color: i <= step ? "white" : "#8E8FA8",
-                    boxShadow: i === step ? "0 4px 14px rgba(88,85,243,0.3)" : "none",
+                    color: i <= step ? "white" : "#64748B",
+                    boxShadow: i === step ? "0 4px 14px rgba(2,132,199,0.3)" : "none",
                     flexShrink: 0,
                   }}
                 >
@@ -608,7 +621,7 @@ export default function Manufacturer() {
                     fontWeight: 700,
                     textTransform: "uppercase",
                     letterSpacing: "0.05em",
-                    color: i === step ? "#5855F3" : "#8E8FA8",
+                    color: i === step ? "#0284C7" : "#64748B",
                     whiteSpace: "nowrap",
                   }}
                 >
@@ -674,6 +687,66 @@ export default function Manufacturer() {
             </button>
           )}
         </div>
+
+        {/* ── Already Registered Info Panel ─────────────────────────── */}
+        {alreadyRegistered && (
+          <div style={{
+            background: "linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)",
+            border: "1.5px solid #F59E0B",
+            borderRadius: 18,
+            padding: "24px 28px",
+            marginTop: 16,
+            boxShadow: "0 4px 20px rgba(245,158,11,0.12)",
+          }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+                <div style={{ fontSize: 28, lineHeight: 1 }}>⚠️</div>
+                <div>
+                  <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 16, color: "#92400E", marginBottom: 4 }}>
+                    Batch Already Registered on DrugChain
+                  </div>
+                  <div style={{ fontSize: 13, color: "#78350F", marginBottom: 12 }}>
+                    This batch was previously registered. Below are the existing on-chain details.
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
+                    {[
+                      { label: "Batch ID", value: alreadyRegistered.batchId || "—" },
+                      { label: "Medicine", value: alreadyRegistered.name || alreadyRegistered.medicineName || "—" },
+                      { label: "Manufacturer", value: alreadyRegistered.company || alreadyRegistered.manufacturer || "—" },
+                      { label: "Status", value: alreadyRegistered.status || "AUTHENTIC" },
+                      { label: "Blockchain Status", value: alreadyRegistered.blockchainStatus || "Confirmed" },
+                      { label: "Medicine ID", value: alreadyRegistered.id || alreadyRegistered.medicineId || "—" },
+                    ].map(({ label, value }) => (
+                      <div key={label} style={{ background: "rgba(255,255,255,0.7)", borderRadius: 10, padding: "10px 14px" }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "#78350F", marginBottom: 3 }}>{label}</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#1E293B", wordBreak: "break-all" }}>{String(value)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setAlreadyRegistered(null)}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "#92400E", fontSize: 18, padding: "0 4px", lineHeight: 1, flexShrink: 0 }}
+                title="Dismiss"
+              >×</button>
+            </div>
+            <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button
+                onClick={() => { setAlreadyRegistered(null); setStep(1); setForm(f => ({ ...f, batchNumber: "" })); }}
+                style={{ padding: "8px 18px", background: "#F59E0B", color: "white", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+              >
+                Use a Different Batch Number
+              </button>
+              <button
+                onClick={() => setAlreadyRegistered(null)}
+                style={{ padding: "8px 18px", background: "transparent", color: "#92400E", border: "1.5px solid #F59E0B", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* ── Registered Medicines Section ── */}
@@ -727,8 +800,21 @@ export default function Manufacturer() {
                     onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 4px 16px rgba(99,102,241,0.04)"; e.currentTarget.style.borderColor = "#E2E8F0"; }}
                     onClick={() => navigate(`/verify/${encodeURIComponent(m.batchId || m.id)}`)}
                   >
+                    {/* Medicine Image Thumbnail */}
+                    {m.medicineImage && (
+                      <div style={{ marginBottom: 12, borderRadius: 10, overflow: "hidden", border: "1px solid #E2E8F0" }}>
+                        <MedicineImage
+                          src={m.medicineImage}
+                          alt={m.name}
+                          style={{ height: 110 }}
+                          placeholderSize={110}
+                        />
+                      </div>
+                    )}
+
                     {/* Status badge */}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+
                       <span style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: statusColor, background: statusBg, padding: "4px 10px", borderRadius: 100, border: `1px solid ${statusColor}30` }}>
                         {m.status || "AUTHENTIC"}
                       </span>
@@ -750,7 +836,7 @@ export default function Manufacturer() {
                       ))}
                     </div>
 
-                    <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid #F1F5F9", display: "flex", alignItems: "center", gap: 6, color: "#6366F1", fontSize: 12, fontWeight: 700 }}>
+                    <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid #F1F5F9", display: "flex", alignItems: "center", gap: 6, color: "#0284C7", fontSize: 12, fontWeight: 700 }}>
                       <QrCode size={13} /> View Blockchain Record
                     </div>
                   </div>
@@ -762,7 +848,7 @@ export default function Manufacturer() {
             <div style={{ textAlign: "center", padding: "60px 20px", background: "#FFFFFF", borderRadius: 20, border: "1px solid #E2E8F0" }}>
               <Package size={48} color="#94A3B8" style={{ margin: "0 auto 16px" }} />
               <p style={{ fontWeight: 700, color: "#64748B", fontSize: 15 }}>No medicines registered yet.</p>
-              <p style={{ color: "#94A3B8", fontSize: 13, marginTop: 4 }}>Use the form above to register your first medicine on DrugChain.</p>
+              <p style={{ color: "#94A3B8", fontSize: 13, marginTop: 4 }}>Use the form above to register your first medicine on MediChainAI.</p>
             </div>
           )}
         </section>

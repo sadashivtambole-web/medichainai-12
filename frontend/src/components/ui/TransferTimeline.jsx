@@ -1,8 +1,8 @@
 import { Clock, ExternalLink } from "lucide-react";
 
 const ROLE_COLORS = {
-  Manufacturer: { bg: "#EEF0FD", border: "rgba(88,85,243,0.3)", text: "#5855F3", dot: "#5855F3" },
-  Distributor: { bg: "#F3E8FF", border: "rgba(168,85,247,0.3)", text: "#7E22CE", dot: "#8B5CF6" },
+  Manufacturer: { bg: "#F0F9FF", border: "rgba(2,132,199,0.3)", text: "#0284C7", dot: "#0284C7" },
+  Distributor: { bg: "#F0FDFA", border: "rgba(13,148,136,0.3)", text: "#0D9488", dot: "#0D9488" },
   Pharmacy: { bg: "#FEF3C7", border: "rgba(245,158,11,0.3)", text: "#B45309", dot: "#F59E0B" },
   Customer: { bg: "#F0FDF4", border: "rgba(16,185,129,0.3)", text: "#047857", dot: "#10B981" },
 };
@@ -98,7 +98,7 @@ export default function TransferTimeline({ history = [] }) {
                       fontFamily: "monospace",
                       fontSize: 11,
                       fontWeight: 600,
-                      color: "#5855F3",
+                      color: "#0284C7",
                       display: "flex",
                       alignItems: "center",
                       gap: 4,

@@ -36,8 +36,33 @@ export const authService = {
     return res;
   },
 
+  async verifyRegistrationOtp(email, otp, registrationId = "") {
+    return api.post("/auth/verify-registration-otp", { email, otp, registrationId });
+  },
+
+  async verifyLoginOtp(email, otp, loginSessionToken) {
+    const res = await api.post("/auth/verify-login-otp", { email, otp, loginSessionToken });
+    if (res.success && res.data?.token) {
+      localStorage.setItem("token", res.data.token);
+      localStorage.setItem("user", JSON.stringify(res.data.user));
+    }
+    return res;
+  },
+
+  async resendOtp(email, purpose = "LOGIN", loginSessionToken = "", registrationId = "") {
+    return api.post("/auth/resend-otp", { email, purpose, loginSessionToken, registrationId });
+  },
+
   async changePassword(newPassword, confirmPassword) {
     return api.post("/auth/change-password", { newPassword, confirmPassword });
+  },
+
+  async forgotPassword(email) {
+    return api.post("/auth/forgot-password", { email });
+  },
+
+  async resetPassword(email, otp, newPassword, confirmPassword) {
+    return api.post("/auth/reset-password", { email, otp, newPassword, confirmPassword });
   },
 
   async getMe() {
@@ -85,6 +110,10 @@ export const authService = {
 
   async resendCredentials(userId) {
     return api.post(`/creator/users/${userId}/resend-credentials`);
+  },
+
+  async resendNotification(userId) {
+    return api.post(`/creator/users/${userId}/resend-notification`);
   },
 
   async runOcrAssistance(userId) {

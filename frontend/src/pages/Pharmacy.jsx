@@ -6,6 +6,7 @@ import Header from "../components/layout/Header";
 import BlockchainStatus from "../components/ui/BlockchainStatus";
 import TransferTimeline from "../components/ui/TransferTimeline";
 import StatusBadge from "../components/ui/StatusBadge";
+import MedicineImage from "../components/ui/MedicineImage";
 import CameraScanner from "../components/forms/CameraScanner";
 import QRImageUpload from "../components/forms/QRImageUpload";
 import { useApp } from "../context/AppContext";
@@ -146,29 +147,29 @@ export default function Pharmacy() {
               width: 52,
               height: 52,
               borderRadius: 16,
-              background: "linear-gradient(135deg,#5855F3,#4743EB)",
+              background: "linear-gradient(135deg,#0284C7,#0369A1)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              boxShadow: "0 6px 20px rgba(88,85,243,0.25)",
+              boxShadow: "0 8px 24px rgba(2,132,199,0.25)",
             }}
           >
             <Store size={26} color="white" />
           </div>
           <div>
-            <h1 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: "2rem", fontWeight: 800, color: "#18182E" }}>
+            <h1 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: "2rem", fontWeight: 800, color: "#0F172A" }}>
               Pharmacy POS
             </h1>
-            <p style={{ fontSize: 13, color: "#5F607A", marginTop: 2 }}>
+            <p style={{ fontSize: 13, color: "#64748B", marginTop: 2 }}>
               Scan, receive and verify medicines before shelf stocking
             </p>
           </div>
         </div>
 
         {/* ── Scan / Search Panel ── */}
-        <div style={{ background: "#FFFFFF", border: "1px solid #E8EAF6", borderRadius: 20, padding: 28, marginBottom: 28, boxShadow: "0 4px 20px rgba(0,0,0,0.03)" }}>
+        <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 20, padding: 28, marginBottom: 28, boxShadow: "0 4px 20px rgba(15,23,42,0.03)" }}>
           {/* Tab switcher */}
-          <div style={{ display: "flex", background: "#F8F9FE", border: "1px solid #E8EAF6", borderRadius: 12, padding: 4, marginBottom: 20, gap: 4 }}>
+          <div style={{ display: "flex", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 12, padding: 4, marginBottom: 20, gap: 4 }}>
             {inputTabs.map((t) => (
               <button
                 key={t.id}
@@ -192,8 +193,8 @@ export default function Pharmacy() {
                   fontWeight: 700,
                   transition: "all 0.2s",
                   background: inputTab === t.id ? "#FFFFFF" : "transparent",
-                  color: inputTab === t.id ? "#5855F3" : "#5F607A",
-                  boxShadow: inputTab === t.id ? "0 2px 8px rgba(88,85,243,0.12)" : "none",
+                  color: inputTab === t.id ? "#0284C7" : "#64748B",
+                  boxShadow: inputTab === t.id ? "0 2px 8px rgba(2,132,199,0.15)" : "none",
                 }}
               >
                 {t.icon} {t.label}
@@ -204,7 +205,7 @@ export default function Pharmacy() {
           {/* Manual input */}
           {inputTab === INPUT_TAB.MANUAL && (
             <div>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#5F607A", marginBottom: 10 }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#64748B", marginBottom: 10 }}>
                 Enter Batch ID or Medicine ID
               </label>
               <div style={{ display: "flex", gap: 12 }}>
@@ -217,20 +218,20 @@ export default function Pharmacy() {
                   style={{
                     flex: 1,
                     background: "#FFFFFF",
-                    border: "1px solid #E8EAF6",
+                    border: "1px solid #E2E8F0",
                     borderRadius: 12,
                     padding: "12px 16px",
                     fontFamily: "'Plus Jakarta Sans', sans-serif",
                     fontSize: 14,
-                    color: "#18182E",
+                    color: "#0F172A",
                     outline: "none",
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = "#5855F3";
-                    e.target.style.boxShadow = "0 0 0 3px rgba(88,85,243,0.1)";
+                    e.target.style.borderColor = "#0284C7";
+                    e.target.style.boxShadow = "0 0 0 3px rgba(2,132,199,0.15)";
                   }}
                   onBlur={(e) => {
-                    e.target.style.borderColor = "#E8EAF6";
+                    e.target.style.borderColor = "#E2E8F0";
                     e.target.style.boxShadow = "none";
                   }}
                 />
@@ -298,7 +299,24 @@ export default function Pharmacy() {
           <div style={{ display: "grid", gap: 24 }}>
             {/* Medicine Info — READ ONLY */}
             <div style={{ background: "#FFFFFF", border: "1px solid #E8EAF6", borderRadius: 20, padding: 28, boxShadow: "0 4px 20px rgba(0,0,0,0.03)" }}>
+
+              {/* ── Manufacturer Image ── */}
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.07em", color: "#64748B", marginBottom: 8 }}>
+                  📸 Manufacturer Reference Image
+                </div>
+                <div style={{ borderRadius: 12, overflow: "hidden", border: "1px solid #E2E8F0", maxHeight: 200 }}>
+                  <MedicineImage
+                    src={found.medicineImage}
+                    alt={`${found.name} packaging`}
+                    style={{ height: 200 }}
+                    placeholderSize={120}
+                  />
+                </div>
+              </div>
+
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+
                 <div>
                   <h2 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: "1.6rem", fontWeight: 800, color: "#18182E", marginBottom: 4 }}>
                     {found.name}
@@ -317,13 +335,13 @@ export default function Pharmacy() {
                   gap: 6,
                   padding: "4px 14px",
                   borderRadius: 100,
-                  background: "#EEF0FD",
-                  border: "1px solid rgba(88,85,243,0.25)",
+                  background: "#F0F9FF",
+                  border: "1px solid rgba(2,132,199,0.25)",
                   fontSize: 11,
                   fontWeight: 700,
                   letterSpacing: "0.05em",
                   textTransform: "uppercase",
-                  color: "#5855F3",
+                  color: "#0284C7",
                   marginBottom: 18,
                 }}
               >
@@ -342,24 +360,24 @@ export default function Pharmacy() {
                   { label: "Price (MRP)", value: found.price },
                   { label: "AI Verification", value: found.aiVerification?.status === "MATCHED" ? "✓ Matched" : "⚠ Mismatch" },
                 ].map(({ label, value }) => (
-                  <div key={label} style={{ padding: "12px 14px", borderRadius: 10, background: "#F8F9FE", border: "1px solid #E8EAF6" }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "#8E8FA8", marginBottom: 4 }}>
+                  <div key={label} style={{ padding: "12px 14px", borderRadius: 10, background: "#F8FAFC", border: "1px solid #E2E8F0" }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "#64748B", marginBottom: 4 }}>
                       {label}
                     </div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#18182E" }}>{value}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>{value}</div>
                   </div>
                 ))}
               </div>
             </div>
 
             {/* Verification Pipeline */}
-            <div style={{ background: "#FFFFFF", border: "1px solid #E8EAF6", borderRadius: 20, padding: 28, boxShadow: "0 4px 20px rgba(0,0,0,0.03)" }}>
+            <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 20, padding: 28, boxShadow: "0 4px 20px rgba(15,23,42,0.03)" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
                 <div>
-                  <h3 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: "1.3rem", fontWeight: 800, color: "#18182E", marginBottom: 4 }}>
+                  <h3 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: "1.3rem", fontWeight: 800, color: "#0F172A", marginBottom: 4 }}>
                     Verification Pipeline
                   </h3>
-                  <p style={{ fontSize: 13, color: "#5F607A" }}>5-layer authenticity check</p>
+                  <p style={{ fontSize: 13, color: "#64748B" }}>5-layer authenticity check</p>
                 </div>
                 {!verified && (
                   <button
@@ -395,8 +413,8 @@ export default function Pharmacy() {
                         gap: 14,
                         padding: "12px 16px",
                         borderRadius: 10,
-                        background: isDone ? "#F0FDF4" : isActive ? "#EEF0FD" : "#F8F9FE",
-                        border: `1px solid ${isDone ? "rgba(16,185,129,0.3)" : isActive ? "rgba(88,85,243,0.3)" : "#E8EAF6"}`,
+                        background: isDone ? "#F0FDF4" : isActive ? "#F0F9FF" : "#F8FAFC",
+                        border: `1px solid ${isDone ? "rgba(16,185,129,0.3)" : isActive ? "rgba(2,132,199,0.3)" : "#E2E8F0"}`,
                         transition: "all 0.3s",
                       }}
                     >
@@ -405,14 +423,14 @@ export default function Pharmacy() {
                           width: 28,
                           height: 28,
                           borderRadius: "50%",
-                          background: isDone ? "#10B981" : isActive ? "#5855F3" : "#FFFFFF",
-                          border: `1px solid ${isDone ? "#10B981" : isActive ? "#5855F3" : "#E8EAF6"}`,
+                          background: isDone ? "#059669" : isActive ? "#0284C7" : "#FFFFFF",
+                          border: `1px solid ${isDone ? "#059669" : isActive ? "#0284C7" : "#CBD5E1"}`,
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
                           flexShrink: 0,
                           fontSize: 12,
-                          color: isDone || isActive ? "white" : "#8E8FA8",
+                          color: isDone || isActive ? "white" : "#64748B",
                           fontWeight: 800,
                         }}
                       >
@@ -423,7 +441,7 @@ export default function Pharmacy() {
                           fontFamily: "'Plus Jakarta Sans', sans-serif",
                           fontSize: 13,
                           fontWeight: 700,
-                          color: isDone ? "#065F46" : isActive ? "#5855F3" : "#5F607A",
+                          color: isDone ? "#065F46" : isActive ? "#0284C7" : "#64748B",
                           flex: 1,
                         }}
                       >

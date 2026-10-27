@@ -65,23 +65,23 @@ export default function FileUpload({ label, accept, value, onChange, hint }) {
     <div
       {...getRootProps()}
       style={{
-        border: `1px dashed ${isDragActive ? "#5855F3" : "#D1D5DB"}`,
+        border: `1px dashed ${isDragActive ? "#0284C7" : "#CBD5E1"}`,
         borderRadius: 12,
         padding: "28px 20px",
-        background: isDragActive ? "#EEF0FD" : "#FFFFFF",
+        background: isDragActive ? "#F0F9FF" : "#FFFFFF",
         textAlign: "center",
         cursor: "pointer",
         transition: "all 0.2s",
-        boxShadow: "0 2px 6px rgba(0,0,0,0.02)",
+        boxShadow: "0 2px 6px rgba(15,23,42,0.02)",
       }}
     >
       <input {...getInputProps()} />
       <Upload
         size={24}
-        color={isDragActive ? "#5855F3" : "#8E8FA8"}
+        color={isDragActive ? "#0284C7" : "#94A3B8"}
         style={{ margin: "0 auto 10px" }}
       />
-      <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 13, fontWeight: 700, color: isDragActive ? "#5855F3" : "#18182E" }}>
+      <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 13, fontWeight: 700, color: isDragActive ? "#0284C7" : "#0F172A" }}>
         {isDragActive ? "Drop file here..." : `Upload ${label}`}
       </div>
       {hint && (

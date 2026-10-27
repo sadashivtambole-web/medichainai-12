@@ -107,14 +107,14 @@ export default function Profile() {
                 width: 64,
                 height: 64,
                 borderRadius: 20,
-                background: "linear-gradient(135deg,#5855F3,#4743EB)",
+                background: "linear-gradient(135deg,#0284C7,#0369A1)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 color: "white",
                 fontSize: 24,
                 fontWeight: 800,
-                boxShadow: "0 8px 24px rgba(88,85,243,0.25)",
+                boxShadow: "0 8px 24px rgba(2,132,199,0.25)",
               }}
             >
               {user.name ? user.name.charAt(0).toUpperCase() : "U"}
@@ -126,7 +126,7 @@ export default function Profile() {
                   fontFamily: "'Plus Jakarta Sans', sans-serif",
                   fontSize: "1.6rem",
                   fontWeight: 800,
-                  color: "#18182E",
+                  color: "#0F172A",
                   marginBottom: 4,
                 }}
               >
@@ -141,14 +141,14 @@ export default function Profile() {
                     letterSpacing: "0.08em",
                     padding: "3px 12px",
                     borderRadius: 100,
-                    background: "#EEF0FD",
-                    color: "#5855F3",
-                    border: "1px solid rgba(88,85,243,0.25)",
+                    background: "#F0F9FF",
+                    color: "#0284C7",
+                    border: "1px solid rgba(2,132,199,0.25)",
                   }}
                 >
                   {user.role}
                 </span>
-                <span style={{ fontSize: 13, color: "#5F607A" }}>{user.email}</span>
+                <span style={{ fontSize: 13, color: "#64748B" }}>{user.email}</span>
               </div>
             </div>
           </div>
@@ -161,16 +161,16 @@ export default function Profile() {
                 alignItems: "center",
                 justifyContent: "space-between",
                 padding: "16px 20px",
-                background: "#F8F9FE",
-                border: "1px solid #E8EAF6",
+                background: "#F8FAFC",
+                border: "1px solid #E2E8F0",
                 borderRadius: 14,
               }}
             >
               <div>
-                <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "#8E8FA8", marginBottom: 2 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "#64748B", marginBottom: 2 }}>
                   System Role (Read-Only)
                 </div>
-                <div style={{ fontSize: 14, fontWeight: 800, color: "#5855F3" }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: "#0284C7" }}>
                   {user.role}
                 </div>
               </div>

@@ -1,18 +1,18 @@
 import { useState } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import { useApp } from "../../context/AppContext";
 import {
-  Building2,
-  Server,
-  Store,
-  User,
-  Shield,
+  ShieldCheck,
   LogOut,
   ChevronDown,
   LogIn,
   UserPlus,
-  Globe,
-  Info
+  Menu,
+  X,
+  Activity,
+  Layers,
+  LayoutDashboard
 } from "lucide-react";
 
 export default function Header() {
@@ -20,23 +20,27 @@ export default function Header() {
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-  const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + "/");
+  const isActive = (path) =>
+    location.pathname === path ||
+    (path !== "/" && location.pathname.startsWith(path));
 
   const handleLogout = () => {
     logout();
     setMenuOpen(false);
+    setMobileNavOpen(false);
     navigate("/login");
   };
 
   const userRole = (user?.role || "").toLowerCase().trim();
 
-  // Role-specific navigation items based on requirement #11
+  // Role-specific navigation items
   const getNavLinks = () => {
     if (!user) {
       return [
         { label: "Home", path: "/" },
-        { label: "About", path: "/about" },
+        { label: "About Network", path: "/about" },
         { label: "Verify Medicine", path: "/customer" },
       ];
     }
@@ -44,39 +48,39 @@ export default function Header() {
     switch (userRole) {
       case "creator":
         return [
-          { label: "Creator Console", path: "/creator" },
+          { label: "Console", path: "/creator" },
           { label: "Pending Approvals", path: "/creator/approvals" },
-          { label: "Users", path: "/creator/users" },
-          { label: "Medicines", path: "/creator/medicines" },
-          { label: "Transfers", path: "/creator/transfers" },
+          { label: "Participants", path: "/creator/users" },
+          { label: "Medicine Registry", path: "/creator/medicines" },
           { label: "Blockchain", path: "/creator/blockchain" },
-          { label: "Profile", path: "/profile" },
+          { label: "Verify", path: "/customer" },
         ];
       case "manufacturer":
         return [
           { label: "Home", path: "/" },
-          { label: "Manufacturer Dashboard", path: "/manufacturer" },
+          { label: "Manufacturer Portal", path: "/manufacturer" },
           { label: "Verify Medicine", path: "/customer" },
           { label: "Profile", path: "/profile" },
         ];
       case "distributor":
         return [
           { label: "Home", path: "/" },
-          { label: "Distributor Dashboard", path: "/distributor" },
+          { label: "Distributor Portal", path: "/distributor" },
           { label: "Verify Medicine", path: "/customer" },
           { label: "Profile", path: "/profile" },
         ];
       case "pharmacy":
         return [
           { label: "Home", path: "/" },
-          { label: "Pharmacy Dashboard", path: "/pharmacy" },
+          { label: "Pharmacy Portal", path: "/pharmacy" },
           { label: "Verify Medicine", path: "/customer" },
           { label: "Profile", path: "/profile" },
         ];
       case "customer":
         return [
           { label: "Home", path: "/" },
-          { label: "User Dashboard", path: "/customer" },
+          { label: "Verification Desk", path: "/customer" },
+          { label: "About", path: "/about" },
           { label: "Profile", path: "/profile" },
         ];
       default:
@@ -86,305 +90,242 @@ export default function Header() {
 
   const navLinks = getNavLinks();
 
-  return (
-    <header
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 100,
-        borderBottom: "1px solid rgba(226, 232, 240, 0.8)",
-        background: "rgba(255, 255, 255, 0.88)",
-        backdropFilter: "blur(20px)",
-        WebkitBackdropFilter: "blur(20px)",
-        boxShadow: "0 4px 20px rgba(99, 102, 241, 0.04)",
-      }}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 1440,
-          margin: "0 auto",
-          padding: "0 36px",
-          height: 72,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        {/* Logo */}
-        <button
-          onClick={() => navigate("/")}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-          }}
-        >
-          <div
-            style={{
-              width: 38,
-              height: 38,
-              borderRadius: 12,
-              background: "linear-gradient(135deg, #5855F3, #4743EB)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 4px 12px rgba(88,85,243,0.25)",
-            }}
-          >
-            <Shield size={20} color="white" />
-          </div>
-          <span
-            style={{
-              fontFamily: "'Plus Jakarta Sans', sans-serif",
-              fontWeight: 800,
-              fontSize: 16,
-              letterSpacing: "-0.02em",
-              color: "#18182E",
-            }}
-          >
-            DrugChain
-          </span>
-        </button>
+  const getRoleBadgeColor = (role) => {
+    switch (role?.toLowerCase()) {
+      case "creator":
+        return { bg: "#F0F9FF", border: "#BAE6FD", text: "#0369A1", dot: "#0284C7" };
+      case "manufacturer":
+        return { bg: "#F0FDFA", border: "#99F6E4", text: "#0F766E", dot: "#0D9488" };
+      case "distributor":
+        return { bg: "#EFF6FF", border: "#BFDBFE", text: "#1D4ED8", dot: "#2563EB" };
+      case "pharmacy":
+        return { bg: "#ECFDF5", border: "#A7F3D0", text: "#047857", dot: "#059669" };
+      default:
+        return { bg: "#F8FAFC", border: "#E2E8F0", text: "#475569", dot: "#64748B" };
+    }
+  };
 
-        {/* Role-Specific Nav Links */}
-        <nav style={{ display: "flex", gap: 4, alignItems: "center" }}>
-          {navLinks.map((item, idx) => {
+  const roleStyle = getRoleBadgeColor(user?.role);
+
+  return (
+    <header className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-[0_2px_12px_rgba(2,132,199,0.04)]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
+        {/* Brand Logo */}
+        <Link
+          to="/"
+          className="flex items-center gap-3 group text-decoration-none"
+        >
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-sky-500/20 group-hover:scale-105 transition-transform duration-200">
+            <ShieldCheck size={22} strokeWidth={2.2} />
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="font-extrabold text-slate-900 tracking-tight text-lg">
+                Medi<span className="text-sky-600">Chain</span>
+              </span>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 border border-teal-200/80 uppercase tracking-wider">
+                AI
+              </span>
+            </div>
+            <p className="text-[10px] font-medium text-slate-400 tracking-wide hidden sm:block">
+              Healthcare Supply-Chain Integrity
+            </p>
+          </div>
+        </Link>
+
+        {/* Desktop Navigation Links */}
+        <nav className="hidden md:flex items-center gap-1 bg-slate-50/80 p-1.5 rounded-xl border border-slate-200/60">
+          {navLinks.map((item) => {
             const active = isActive(item.path);
             return (
-              <button
-                key={`${item.label}-${idx}`}
-                onClick={() => navigate(item.path)}
-                style={{
-                  background: active ? "rgba(99,102,241,0.09)" : "none",
-                  border: active ? "1px solid rgba(99,102,241,0.2)" : "1px solid transparent",
-                  borderRadius: 10,
-                  cursor: "pointer",
-                  fontFamily: "'Plus Jakarta Sans', sans-serif",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: active ? "#4F46E5" : "#5F607A",
-                  transition: "all 0.2s ease",
-                  padding: "6px 12px",
-                  whiteSpace: "nowrap",
-                }}
-                onMouseEnter={(e) => {
-                  if (!active) { e.currentTarget.style.color = "#5855F3"; e.currentTarget.style.background = "rgba(99,102,241,0.06)"; }
-                }}
-                onMouseLeave={(e) => {
-                  if (!active) { e.currentTarget.style.color = "#5F607A"; e.currentTarget.style.background = "none"; }
-                }}
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`relative px-3.5 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-all duration-200 ${
+                  active
+                    ? "text-sky-700 font-bold"
+                    : "text-slate-600 hover:text-sky-600 hover:bg-slate-100/70"
+                }`}
               >
-                {item.label}
-              </button>
+                {active && (
+                  <motion.div
+                    layoutId="activeNavTab"
+                    className="absolute inset-0 bg-white rounded-lg border border-sky-100 shadow-sm"
+                    transition={{ type: "spring", stiffness: 450, damping: 35 }}
+                  />
+                )}
+                <span className="relative z-10">{item.label}</span>
+              </Link>
             );
           })}
         </nav>
 
-        {/* Right Auth Section */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        {/* Right Section: Auth & User Menu */}
+        <div className="flex items-center gap-3">
           {user ? (
-            <div style={{ position: "relative" }}>
+            <div className="relative">
               <button
                 onClick={() => setMenuOpen(!menuOpen)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: "6px 14px 6px 8px",
-                  borderRadius: 12,
-                  background: "#F8F9FE",
-                  border: "1px solid #E8EAF6",
-                  cursor: "pointer",
-                  transition: "all 0.2s",
-                }}
+                className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100/80 border border-slate-200 transition-colors"
               >
-                <div
-                  style={{
-                    width: 30,
-                    height: 30,
-                    borderRadius: 8,
-                    background: "#5855F3",
-                    color: "white",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontWeight: 800,
-                    fontSize: 13,
-                  }}
-                >
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-600 to-teal-600 text-white flex items-center justify-center font-bold text-xs shadow-sm">
                   {user.name?.charAt(0).toUpperCase() || "U"}
                 </div>
-                <div style={{ textAlign: "left" }}>
-                  <div
-                    style={{
-                      fontFamily: "'Plus Jakarta Sans', sans-serif",
-                      fontSize: 13,
-                      fontWeight: 800,
-                      color: "#18182E",
-                      maxWidth: 130,
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
+                <div className="text-left hidden sm:block">
+                  <div className="text-xs font-bold text-slate-900 max-w-[120px] truncate">
                     {user.name}
                   </div>
-                  <div
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 800,
-                      color: "#5855F3",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                    }}
-                  >
-                    {user.role}
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span
+                      className="w-1.5 h-1.5 rounded-full"
+                      style={{ backgroundColor: roleStyle.dot }}
+                    />
+                    <span
+                      className="text-[10px] font-bold uppercase tracking-wider"
+                      style={{ color: roleStyle.text }}
+                    >
+                      {user.role}
+                    </span>
                   </div>
                 </div>
-                <ChevronDown size={14} color="#8E8FA8" />
+                <ChevronDown
+                  size={14}
+                  className={`text-slate-400 transition-transform duration-200 ${
+                    menuOpen ? "rotate-180" : ""
+                  }`}
+                />
               </button>
 
-              {/* Dropdown Menu */}
-              {menuOpen && (
-                <div
-                  style={{
-                    position: "absolute",
-                    right: 0,
-                    top: "calc(100% + 8px)",
-                    width: 200,
-                    background: "#FFFFFF",
-                    border: "1px solid #E8EAF6",
-                    borderRadius: 14,
-                    boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
-                    padding: 8,
-                    zIndex: 200,
-                  }}
-                >
-                  <button
-                    onClick={() => {
-                      setMenuOpen(false);
-                      const dashboardMap = {
-                        creator: "/creator",
-                        manufacturer: "/manufacturer",
-                        distributor: "/distributor",
-                        pharmacy: "/pharmacy",
-                        customer: "/customer",
-                      };
-                      navigate(dashboardMap[userRole] || "/");
-                    }}
-                    style={{
-                      width: "100%",
-                      textAlign: "left",
-                      padding: "10px 12px",
-                      borderRadius: 8,
-                      border: "none",
-                      background: "none",
-                      fontSize: 13,
-                      fontWeight: 800,
-                      color: "#5855F3",
-                      cursor: "pointer",
-                    }}
-                    onMouseEnter={(e) => (e.target.style.background = "#EEF0FD")}
-                    onMouseLeave={(e) => (e.target.style.background = "none")}
+              {/* User Dropdown Menu */}
+              <AnimatePresence>
+                {menuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 mt-2 w-56 bg-white rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/50 p-1.5 z-50"
                   >
-                    🚀 My Dashboard
-                  </button>
-                  <button
-                    onClick={() => {
-                      setMenuOpen(false);
-                      navigate("/profile");
-                    }}
-                    style={{
-                      width: "100%",
-                      textAlign: "left",
-                      padding: "10px 12px",
-                      borderRadius: 8,
-                      border: "none",
-                      background: "none",
-                      fontSize: 13,
-                      fontWeight: 700,
-                      color: "#18182E",
-                      cursor: "pointer",
-                    }}
-                    onMouseEnter={(e) => (e.target.style.background = "#F8F9FE")}
-                    onMouseLeave={(e) => (e.target.style.background = "none")}
-                  >
-                    👤 My Profile
-                  </button>
+                    <div className="px-3 py-2.5 border-b border-slate-100 mb-1">
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                        Signed in as
+                      </p>
+                      <p className="text-xs font-bold text-slate-900 truncate">
+                        {user.email}
+                      </p>
+                    </div>
 
-                  <div style={{ height: 1, background: "#F1F3FC", margin: "4px 0" }} />
+                    <button
+                      onClick={() => {
+                        setMenuOpen(false);
+                        const roleDashboard = {
+                          creator: "/creator",
+                          manufacturer: "/manufacturer",
+                          distributor: "/distributor",
+                          pharmacy: "/pharmacy",
+                          customer: "/customer",
+                        };
+                        navigate(roleDashboard[userRole] || "/");
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-sky-700 hover:bg-sky-50 transition-colors text-left"
+                    >
+                      <LayoutDashboard size={14} /> My Dashboard
+                    </button>
 
-                  <button
-                    onClick={handleLogout}
-                    style={{
-                      width: "100%",
-                      textAlign: "left",
-                      padding: "10px 12px",
-                      borderRadius: 8,
-                      border: "none",
-                      background: "none",
-                      fontSize: 13,
-                      fontWeight: 700,
-                      color: "#DC2626",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                    }}
-                    onMouseEnter={(e) => (e.target.style.background = "#FEF2F2")}
-                    onMouseLeave={(e) => (e.target.style.background = "none")}
-                  >
-                    <LogOut size={14} /> Sign Out
-                  </button>
-                </div>
-              )}
+                    <button
+                      onClick={() => {
+                        setMenuOpen(false);
+                        navigate("/profile");
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                    >
+                      <Layers size={14} /> Account Profile
+                    </button>
+
+                    <div className="h-px bg-slate-100 my-1" />
+
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors text-left"
+                    >
+                      <LogOut size={14} /> Sign Out
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           ) : (
-            <>
+            <div className="flex items-center gap-2">
               <Link
                 to="/login"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "8px 16px",
-                  borderRadius: 10,
-                  border: "1px solid #E8EAF6",
-                  background: "#FFFFFF",
-                  color: "#18182E",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  textDecoration: "none",
-                }}
+                className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:text-sky-600 hover:border-sky-300 hover:bg-sky-50/50 transition-all"
               >
-                <LogIn size={14} /> Sign In
+                <LogIn size={13} /> Sign In
               </Link>
               <Link
                 to="/register"
-                className="btn-primary"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "8px 16px",
-                  borderRadius: 10,
-                  fontSize: 13,
-                  fontWeight: 700,
-                  textDecoration: "none",
-                }}
+                className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-gradient-to-r from-sky-600 to-teal-600 text-white text-xs font-bold shadow-md shadow-sky-600/20 hover:shadow-lg hover:shadow-sky-600/30 hover:-translate-y-0.5 transition-all"
               >
-                <UserPlus size={14} /> Register
+                <UserPlus size={13} /> Join Network
               </Link>
-            </>
+            </div>
           )}
+
+          {/* Mobile Menu Hamburger */}
+          <button
+            onClick={() => setMobileNavOpen(!mobileNavOpen)}
+            className="md:hidden p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50"
+            aria-label="Toggle navigation menu"
+          >
+            {mobileNavOpen ? <X size={18} /> : <Menu size={18} />}
+          </button>
         </div>
       </div>
+
+      {/* Mobile Drawer Navigation */}
+      <AnimatePresence>
+        {mobileNavOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="md:hidden border-t border-slate-100 bg-white/98 backdrop-blur-lg px-4 py-3 space-y-1"
+          >
+            {navLinks.map((item) => (
+              <Link
+                key={item.path}
+                to={item.path}
+                onClick={() => setMobileNavOpen(false)}
+                className={`block px-3 py-2 rounded-xl text-xs font-bold ${
+                  isActive(item.path)
+                    ? "bg-sky-50 text-sky-700"
+                    : "text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                {item.label}
+              </Link>
+            ))}
+            {!user && (
+              <div className="pt-2 border-t border-slate-100 flex gap-2">
+                <Link
+                  to="/login"
+                  onClick={() => setMobileNavOpen(false)}
+                  className="flex-1 text-center py-2 text-xs font-bold border border-slate-200 rounded-xl"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  to="/register"
+                  onClick={() => setMobileNavOpen(false)}
+                  className="flex-1 text-center py-2 text-xs font-bold bg-sky-600 text-white rounded-xl"
+                >
+                  Register
+                </Link>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </header>
   );
 }

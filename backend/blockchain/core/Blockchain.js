@@ -270,6 +270,7 @@ export class Blockchain {
 
   /**
    * Check if a medicine or batch is already registered on DrugChain
+   * Skips genesis block (index 0) which is not a real medicine registration.
    * @param {string} medicineId
    * @param {string} batchNumber
    * @returns {boolean}
@@ -279,6 +280,7 @@ export class Blockchain {
     const targetBatch = String(batchNumber || "").trim().toUpperCase();
 
     for (const block of this.chain) {
+      if (block.index === 0) continue; // skip genesis
       for (const tx of block.transactions) {
         if (tx.type === TRANSACTION_TYPES.MEDICINE_REGISTERED) {
           if (targetMed && tx.medicineId === targetMed) return true;
@@ -287,6 +289,42 @@ export class Blockchain {
       }
     }
     return false;
+  }
+
+  /**
+   * Retrieve the full registration record for a medicine/batch already on chain.
+   * Returns null if not found.
+   * @param {string} medicineId
+   * @param {string} batchNumber
+   * @returns {Object|null} { tx, block, dataHash, blockIndex, blockHash, timestamp, validator }
+   */
+  getRegistrationRecord(medicineId, batchNumber) {
+    const targetMed = String(medicineId || "").trim().toUpperCase();
+    const targetBatch = String(batchNumber || "").trim().toUpperCase();
+
+    for (const block of this.chain) {
+      if (block.index === 0) continue; // skip genesis
+      for (const tx of block.transactions) {
+        if (tx.type === TRANSACTION_TYPES.MEDICINE_REGISTERED) {
+          const matchesMed = targetMed && tx.medicineId === targetMed;
+          const matchesBatch = targetBatch && tx.batchNumber === targetBatch;
+          if (matchesMed || matchesBatch) {
+            return {
+              medicineId: tx.medicineId,
+              batchNumber: tx.batchNumber,
+              dataHash: tx.dataHash,
+              transactionId: tx.transactionId,
+              blockIndex: block.index,
+              blockHash: block.hash,
+              timestamp: block.timestamp,
+              validator: block.validator,
+              metadata: tx.metadata || {},
+            };
+          }
+        }
+      }
+    }
+    return null;
   }
 
   toJSON() {

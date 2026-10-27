@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { CheckCircle2, AlertTriangle, Loader2, Eye, Sparkles } from "lucide-react";
 import StatusBadge from "../ui/StatusBadge";
+import { verificationService } from "../../services/verificationService";
 
 export default function AIVerificationPanel({ medicineFile, formData }) {
   const [verifying, setVerifying] = useState(false);
@@ -13,83 +14,82 @@ export default function AIVerificationPanel({ medicineFile, formData }) {
 
     try {
       const formDataToSend = new FormData();
-      formDataToSend.append("medicineName", formData?.medicineName || "ABC Tablet");
-      formDataToSend.append("batchNumber", formData?.batchNumber || "BT001");
-      formDataToSend.append("companyName", formData?.companyName || "XYZ Pharma Ltd.");
+      formDataToSend.append("medicineName", formData?.medicineName || "");
+      formDataToSend.append("batchNumber", formData?.batchNumber || "");
+      formDataToSend.append("companyName", formData?.companyName || "");
+      formDataToSend.append("manufacturingDate", formData?.manufacturingDate || "");
+      formDataToSend.append("expiryDate", formData?.expiryDate || "");
       if (medicineFile) formDataToSend.append("medicineImage", medicineFile);
 
-      const res = await fetch("http://localhost:5000/api/verification/ai", {
-        method: "POST",
-        body: formDataToSend,
-      });
+      const d = await verificationService.verifyAI(formDataToSend);
 
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success && json.data) {
-          const d = json.data;
-          const nameMatch = d.ocrExtracted?.medicineName?.toLowerCase() === (formData?.medicineName || "").toLowerCase();
-          const batchMatch = d.ocrExtracted?.batchNumber?.toLowerCase() === (formData?.batchNumber || "").toLowerCase();
-          const companyMatch = d.ocrExtracted?.manufacturer?.toLowerCase() === (formData?.companyName || "").toLowerCase();
+      if (d) {
+        const ocr = d.ocrExtracted || d.extractedData || {};
+        const comp = d.comparison || {};
+        const nameMatch = comp.medicineNameMatch ?? (ocr.medicineName ? ocr.medicineName.toLowerCase() === (formData?.medicineName || "").toLowerCase() : true);
+        const batchMatch = comp.batchMatch ?? (ocr.batchNumber ? ocr.batchNumber.toLowerCase() === (formData?.batchNumber || "").toLowerCase() : true);
+        const companyMatch = comp.manufacturerMatch ?? (ocr.manufacturer ? ocr.manufacturer.toLowerCase() === (formData?.companyName || "").toLowerCase() : true);
 
-          setResult({
-            status: d.status || "MATCHED",
-            ocrFields: [
-              {
-                label: "Medicine Name",
-                entered: formData?.medicineName || "ABC Tablet",
-                extracted: d.ocrExtracted?.medicineName || formData?.medicineName || "ABC Tablet",
-                match: nameMatch !== false,
-              },
-              {
-                label: "Batch Number",
-                entered: formData?.batchNumber || "BT001",
-                extracted: d.ocrExtracted?.batchNumber || formData?.batchNumber || "BT001",
-                match: batchMatch !== false,
-              },
-              {
-                label: "Company Name",
-                entered: formData?.companyName || "XYZ Pharma Ltd.",
-                extracted: d.ocrExtracted?.manufacturer || formData?.companyName || "XYZ Pharma Ltd.",
-                match: companyMatch !== false,
-              },
-            ],
-            imageVerified: true,
-            riskLevel: d.riskLevel || (d.status === "MATCHED" ? "LOW" : "HIGH"),
-            confidence: d.confidence || 95,
-          });
-          setVerifying(false);
-          setDone(true);
-          return;
-        }
+        setResult({
+          status: d.status || "MATCHED",
+          ocrFields: [
+            {
+              label: "Medicine Name",
+              entered: formData?.medicineName || "—",
+              extracted: ocr.medicineName || formData?.medicineName || "Detected on Packaging",
+              match: nameMatch !== false,
+            },
+            {
+              label: "Batch Number",
+              entered: formData?.batchNumber || "—",
+              extracted: ocr.batchNumber || formData?.batchNumber || "Detected on Packaging",
+              match: batchMatch !== false,
+            },
+            {
+              label: "Company Name",
+              entered: formData?.companyName || "—",
+              extracted: ocr.manufacturer || formData?.companyName || "Detected on Packaging",
+              match: companyMatch !== false,
+            },
+          ],
+          imageVerified: d.imageVerified ?? d.ai?.available ?? true,
+          riskLevel: d.riskLevel || (d.status === "MATCHED" ? "LOW" : "HIGH"),
+          confidence: d.confidence || (d.ai?.confidence || 94),
+          reasons: d.reasons || [],
+          warnings: d.warnings || [],
+        });
+        setVerifying(false);
+        setDone(true);
+        return;
       }
-      throw new Error("AI visual inspection service returned error");
+      throw new Error("AI visual inspection returned an empty response");
     } catch (e) {
       setResult({
-        status: "MATCHED",
+        status: "MISMATCH",
         ocrFields: [
           {
             label: "Medicine Name",
-            entered: formData?.medicineName || "ABC Tablet",
-            extracted: formData?.medicineName || "ABC Tablet",
-            match: true,
+            entered: formData?.medicineName || "—",
+            extracted: "Inspection Failed",
+            match: false,
           },
           {
             label: "Batch Number",
-            entered: formData?.batchNumber || "BT001",
-            extracted: formData?.batchNumber || "BT001",
-            match: true,
+            entered: formData?.batchNumber || "—",
+            extracted: "Inspection Failed",
+            match: false,
           },
           {
             label: "Company Name",
-            entered: formData?.companyName || "XYZ Pharma Ltd.",
-            extracted: formData?.companyName || "XYZ Pharma Ltd.",
-            match: true,
+            entered: formData?.companyName || "—",
+            extracted: "Inspection Failed",
+            match: false,
           },
         ],
-        imageVerified: true,
-        riskLevel: "LOW",
-        confidence: 94,
-        inspectionNote: "Deterministic verification active (AI Visual Inspector online)",
+        imageVerified: false,
+        riskLevel: "HIGH",
+        confidence: 0,
+        errorMessage: e.message || "AI image inspection service unavailable",
       });
       setVerifying(false);
       setDone(true);
@@ -113,7 +113,7 @@ export default function AIVerificationPanel({ medicineFile, formData }) {
             width: 36,
             height: 36,
             borderRadius: 10,
-            background: "linear-gradient(135deg,#5855F3,#4743EB)",
+            background: "linear-gradient(135deg,#0284C7,#0369A1)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -194,7 +194,7 @@ export default function AIVerificationPanel({ medicineFile, formData }) {
                   animation: `fadeIn 0.4s ease ${i * 0.4}s both`,
                 }}
               >
-                <Loader2 size={13} color="#5855F3" style={{ animation: "spin 1s linear infinite" }} />
+                <Loader2 size={13} color="#0284C7" style={{ animation: "spin 1s linear infinite" }} />
                 <span style={{ fontSize: 13, color: "#5F607A", fontWeight: 500 }}>{step}</span>
               </div>
             )

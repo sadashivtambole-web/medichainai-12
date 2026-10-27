@@ -169,14 +169,14 @@ export default function ApproverBar() {
               width: 44,
               height: 44,
               borderRadius: 12,
-              background: allApproved ? "#EEF0FD" : "rgba(245,158,11,0.1)",
-              border: `1px solid ${allApproved ? "rgba(88,85,243,0.2)" : "rgba(245,158,11,0.3)"}`,
+              background: allApproved ? "#F0F9FF" : "rgba(245,158,11,0.1)",
+              border: `1px solid ${allApproved ? "rgba(2,132,199,0.2)" : "rgba(245,158,11,0.3)"}`,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
             }}
           >
-            <ShieldCheck size={22} color={allApproved ? "#5855F3" : "#D97706"} />
+            <ShieldCheck size={22} color={allApproved ? "#0284C7" : "#D97706"} />
           </div>
 
           <div>
@@ -186,7 +186,7 @@ export default function ApproverBar() {
                   fontFamily: "'Plus Jakarta Sans', sans-serif",
                   fontSize: "1.2rem",
                   fontWeight: 800,
-                  color: "#18182E",
+                  color: "#0F172A",
                 }}
               >
                 Access Point Approver & Real-Time Integrity Monitor
@@ -199,15 +199,15 @@ export default function ApproverBar() {
                   textTransform: "uppercase",
                   padding: "3px 10px",
                   borderRadius: 100,
-                  background: allApproved ? "#EEF0FD" : "rgba(245,158,11,0.12)",
-                  border: `1px solid ${allApproved ? "rgba(88,85,243,0.2)" : "rgba(245,158,11,0.3)"}`,
-                  color: allApproved ? "#5855F3" : "#D97706",
+                  background: allApproved ? "#F0F9FF" : "rgba(245,158,11,0.12)",
+                  border: `1px solid ${allApproved ? "rgba(2,132,199,0.2)" : "rgba(245,158,11,0.3)"}`,
+                  color: allApproved ? "#0284C7" : "#D97706",
                 }}
               >
                 {allApproved ? "● Live Monitored (6/6 OK)" : `● ${approvedCount}/6 Operational`}
               </span>
             </div>
-            <p style={{ fontSize: 13, color: "#5F607A", marginTop: 2 }}>
+            <p style={{ fontSize: 13, color: "#64748B", marginTop: 2 }}>
               Live real-time monitoring of decentralized node gateways, EVM block height, and throughput.
             </p>
           </div>
@@ -219,11 +219,11 @@ export default function ApproverBar() {
             onClick={handleAuditAll}
             disabled={auditing}
             style={{
-              background: "#EEF0FD",
-              border: "1px solid rgba(88,85,243,0.25)",
+              background: "#F0F9FF",
+              border: "1px solid rgba(2,132,199,0.25)",
               borderRadius: 10,
               padding: "10px 18px",
-              color: "#5855F3",
+              color: "#0284C7",
               fontFamily: "'Plus Jakarta Sans', sans-serif",
               fontSize: 12,
               fontWeight: 700,
@@ -263,12 +263,12 @@ export default function ApproverBar() {
               transition: "all 0.2s ease",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = "rgba(88,85,243,0.3)";
-              e.currentTarget.style.color = "#5855F3";
+              e.currentTarget.style.borderColor = "rgba(2,132,199,0.3)";
+              e.currentTarget.style.color = "#0284C7";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = "#E8EAF6";
-              e.currentTarget.style.color = "#18182E";
+              e.currentTarget.style.borderColor = "#E2E8F0";
+              e.currentTarget.style.color = "#0F172A";
             }}
           >
             {expanded ? "Hide Details" : "View Access Points"}
@@ -295,8 +295,8 @@ export default function ApproverBar() {
               onClick={() => setActiveModalPoint(point)}
               title="Click to view live node diagnostics"
               style={{
-                background: isApproved ? "#FAFAFF" : "rgba(239,68,68,0.04)",
-                border: `1px solid ${isApproved ? "#E8EAF6" : "rgba(239,68,68,0.2)"}`,
+                background: isApproved ? "#F8FAFC" : "rgba(239,68,68,0.04)",
+                border: `1px solid ${isApproved ? "#E2E8F0" : "rgba(239,68,68,0.2)"}`,
                 borderRadius: 10,
                 padding: "10px 12px",
                 display: "flex",
@@ -306,12 +306,12 @@ export default function ApproverBar() {
                 transition: "all 0.2s ease",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = isApproved ? "#5855F3" : "#EF4444";
+                e.currentTarget.style.borderColor = isApproved ? "#0284C7" : "#EF4444";
                 e.currentTarget.style.transform = "translateY(-2px)";
-                e.currentTarget.style.boxShadow = "0 4px 12px rgba(88,85,243,0.1)";
+                e.currentTarget.style.boxShadow = "0 4px 12px rgba(2,132,199,0.1)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = isApproved ? "#E8EAF6" : "rgba(239,68,68,0.2)";
+                e.currentTarget.style.borderColor = isApproved ? "#E2E8F0" : "rgba(239,68,68,0.2)";
                 e.currentTarget.style.transform = "translateY(0)";
                 e.currentTarget.style.boxShadow = "none";
               }}
@@ -331,7 +331,7 @@ export default function ApproverBar() {
                   style={{
                     fontSize: 12,
                     fontWeight: 700,
-                    color: "#18182E",
+                    color: "#0F172A",
                     whiteSpace: "nowrap",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
@@ -341,7 +341,7 @@ export default function ApproverBar() {
                 </div>
                 <div style={{ fontSize: 11, color: "#8E8FA8" }}>{point.latency}</div>
               </div>
-              <Icon size={14} color={isApproved ? "#5855F3" : "#EF4444"} />
+              <Icon size={14} color={isApproved ? "#0284C7" : "#EF4444"} />
             </div>
           );
         })}
@@ -401,14 +401,14 @@ export default function ApproverBar() {
                     transition: "all 0.2s ease",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = "#5855F3";
+                    e.currentTarget.style.borderColor = "#0284C7";
                     e.currentTarget.style.transform = "translateY(-2px)";
-                    e.currentTarget.style.boxShadow = "0 8px 24px rgba(88,85,243,0.08)";
+                    e.currentTarget.style.boxShadow = "0 8px 24px rgba(2,132,199,0.08)";
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = "#E8EAF6";
+                    e.currentTarget.style.borderColor = "#E2E8F0";
                     e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.02)";
+                    e.currentTarget.style.boxShadow = "0 2px 8px rgba(15,23,42,0.02)";
                   }}
                 >
                   <div>
@@ -419,18 +419,18 @@ export default function ApproverBar() {
                             width: 32,
                             height: 32,
                             borderRadius: 8,
-                            background: isApproved ? "#EEF0FD" : "rgba(239,68,68,0.1)",
-                            border: `1px solid ${isApproved ? "rgba(88,85,243,0.2)" : "rgba(239,68,68,0.2)"}`,
+                            background: isApproved ? "#F0F9FF" : "rgba(239,68,68,0.1)",
+                            border: `1px solid ${isApproved ? "rgba(2,132,199,0.2)" : "rgba(239,68,68,0.2)"}`,
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
                           }}
                         >
-                          <Icon size={16} color={isApproved ? "#5855F3" : "#DC2626"} />
+                          <Icon size={16} color={isApproved ? "#0284C7" : "#DC2626"} />
                         </div>
                         <div>
-                          <div style={{ fontSize: 14, fontWeight: 800, color: "#18182E" }}>{point.name}</div>
-                          <div style={{ fontSize: 12, color: "#5F607A" }}>{point.role}</div>
+                          <div style={{ fontSize: 14, fontWeight: 800, color: "#0F172A" }}>{point.name}</div>
+                          <div style={{ fontSize: 12, color: "#64748B" }}>{point.role}</div>
                         </div>
                       </div>
 
@@ -457,7 +457,7 @@ export default function ApproverBar() {
                       </button>
                     </div>
 
-                    <p style={{ fontSize: 12, color: "#5F607A", marginTop: 12, lineHeight: 1.5 }}>
+                    <p style={{ fontSize: 12, color: "#64748B", marginTop: 12, lineHeight: 1.5 }}>
                       {point.details}
                     </p>
                   </div>
@@ -468,7 +468,7 @@ export default function ApproverBar() {
                       gridTemplateColumns: "1fr 1fr",
                       gap: 8,
                       paddingTop: 10,
-                      borderTop: "1px solid #F1F3FC",
+                      borderTop: "1px solid #E2E8F0",
                       fontSize: 11,
                     }}
                   >
@@ -478,7 +478,7 @@ export default function ApproverBar() {
                     </div>
                     <div>
                       <span style={{ color: "#8E8FA8" }}>Endpoint: </span>
-                      <span style={{ color: "#5855F3", fontFamily: "monospace", fontSize: 11, fontWeight: 600 }}>
+                      <span style={{ color: "#0284C7", fontFamily: "monospace", fontSize: 11, fontWeight: 600 }}>
                         {point.endpoint}
                       </span>
                     </div>
@@ -529,11 +529,11 @@ export default function ApproverBar() {
                     width: 48,
                     height: 48,
                     borderRadius: 14,
-                    background: "linear-gradient(135deg,#5855F3,#4743EB)",
+                    background: "linear-gradient(135deg,#0284C7,#0369A1)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    boxShadow: "0 6px 18px rgba(88,85,243,0.25)",
+                    boxShadow: "0 6px 18px rgba(2,132,199,0.25)",
                   }}
                 >
                   {(() => {
@@ -542,22 +542,22 @@ export default function ApproverBar() {
                   })()}
                 </div>
                 <div>
-                  <h3 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: "1.4rem", fontWeight: 800, color: "#18182E" }}>
+                  <h3 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: "1.4rem", fontWeight: 800, color: "#0F172A" }}>
                     {activeModalPoint.name}
                   </h3>
-                  <div style={{ fontSize: 13, color: "#5F607A" }}>{activeModalPoint.role}</div>
+                  <div style={{ fontSize: 13, color: "#64748B" }}>{activeModalPoint.role}</div>
                 </div>
               </div>
 
               <button
                 onClick={() => setActiveModalPoint(null)}
                 style={{
-                  background: "#F8F9FE",
-                  border: "1px solid #E8EAF6",
+                  background: "#F8FAFC",
+                  border: "1px solid #E2E8F0",
                   borderRadius: 10,
                   padding: 6,
                   cursor: "pointer",
-                  color: "#5F607A",
+                  color: "#64748B",
                   display: "flex",
                 }}
               >
@@ -567,44 +567,44 @@ export default function ApproverBar() {
 
             {/* Status Grid */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 20 }}>
-              <div style={{ background: "#F8F9FE", border: "1px solid #E8EAF6", borderRadius: 12, padding: "12px 14px" }}>
-                <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#8E8FA8" }}>Status</div>
+              <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 12, padding: "12px 14px" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#64748B" }}>Status</div>
                 <div style={{ fontSize: 13, fontWeight: 800, color: activeModalPoint.status === "APPROVED" ? "#065F46" : "#DC2626", marginTop: 4 }}>
                   ● {activeModalPoint.status}
                 </div>
               </div>
-              <div style={{ background: "#F8F9FE", border: "1px solid #E8EAF6", borderRadius: 12, padding: "12px 14px" }}>
-                <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#8E8FA8" }}>Live RTT Ping</div>
-                <div style={{ fontSize: 13, fontWeight: 800, color: "#5855F3", marginTop: 4 }}>
+              <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 12, padding: "12px 14px" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#64748B" }}>Live RTT Ping</div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "#0284C7", marginTop: 4 }}>
                   {activeModalPoint.latency}
                 </div>
               </div>
-              <div style={{ background: "#F8F9FE", border: "1px solid #E8EAF6", borderRadius: 12, padding: "12px 14px" }}>
-                <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#8E8FA8" }}>Uptime SLA</div>
-                <div style={{ fontSize: 13, fontWeight: 800, color: "#18182E", marginTop: 4 }}>
+              <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 12, padding: "12px 14px" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#64748B" }}>Uptime SLA</div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "#0F172A", marginTop: 4 }}>
                   {activeModalPoint.uptime}
                 </div>
               </div>
             </div>
 
             {/* Node Metadata */}
-            <div style={{ background: "#FAFAFF", border: "1px solid #E8EAF6", borderRadius: 14, padding: "16px", marginBottom: 20 }}>
+            <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 14, padding: "16px", marginBottom: 20 }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, fontSize: 12 }}>
                 <div>
-                  <span style={{ color: "#8E8FA8" }}>Endpoint: </span>
-                  <span style={{ color: "#5855F3", fontFamily: "monospace", fontWeight: 700 }}>{activeModalPoint.endpoint}</span>
+                  <span style={{ color: "#64748B" }}>Endpoint: </span>
+                  <span style={{ color: "#0284C7", fontFamily: "monospace", fontWeight: 700 }}>{activeModalPoint.endpoint}</span>
                 </div>
                 <div>
-                  <span style={{ color: "#8E8FA8" }}>Auth Protocol: </span>
-                  <span style={{ color: "#18182E", fontWeight: 700 }}>{activeModalPoint.authType}</span>
+                  <span style={{ color: "#64748B" }}>Auth Protocol: </span>
+                  <span style={{ color: "#0F172A", fontWeight: 700 }}>{activeModalPoint.authType}</span>
                 </div>
                 <div>
-                  <span style={{ color: "#8E8FA8" }}>Throughput: </span>
-                  <span style={{ color: "#18182E", fontWeight: 700 }}>{activeModalPoint.requestsPerMin}</span>
+                  <span style={{ color: "#64748B" }}>Throughput: </span>
+                  <span style={{ color: "#0F172A", fontWeight: 700 }}>{activeModalPoint.requestsPerMin}</span>
                 </div>
                 <div>
-                  <span style={{ color: "#8E8FA8" }}>Security Signature: </span>
-                  <span style={{ color: "#5855F3", fontFamily: "monospace", fontWeight: 700 }}>{activeModalPoint.securityHash}</span>
+                  <span style={{ color: "#64748B" }}>Security Signature: </span>
+                  <span style={{ color: "#0284C7", fontFamily: "monospace", fontWeight: 700 }}>{activeModalPoint.securityHash}</span>
                 </div>
               </div>
             </div>
@@ -612,14 +612,14 @@ export default function ApproverBar() {
             {/* Live Terminal Log Stream */}
             <div style={{ marginBottom: 24 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                <Terminal size={14} color="#5855F3" />
-                <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: "#5F607A" }}>
+                <Terminal size={14} color="#0284C7" />
+                <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: "#64748B" }}>
                   Live Real-Time Event Stream
                 </span>
               </div>
               <div
                 style={{
-                  background: "#18182E",
+                  background: "#0F172A",
                   borderRadius: 12,
                   padding: "14px 16px",
                   color: "#93C5FD",
@@ -644,7 +644,7 @@ export default function ApproverBar() {
                 className="btn-secondary"
                 style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
               >
-                <Zap size={15} color="#5855F3" /> {pinging ? "Pinging..." : "Test Live Ping"}
+                <Zap size={15} color="#0284C7" /> {pinging ? "Pinging..." : "Test Live Ping"}
               </button>
 
               <button

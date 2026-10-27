@@ -43,3 +43,8 @@ Thumbs.db
 # Uploads directory (runtime data)
 backend/uploads/*
 !backend/uploads/.gitkeep
+
+# Archive / zip files
+*.zip
+*.tar.gz
+*.rar

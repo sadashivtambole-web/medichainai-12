@@ -11,8 +11,8 @@ export const transferService = {
     return res.data;
   },
 
-  async forwardToPharmacy(transferId) {
-    const res = await api.post(`/transfers/${encodeURIComponent(transferId)}/forward`);
+  async forwardToPharmacy(transferId, pharmacyData = {}) {
+    const res = await api.post(`/transfers/${encodeURIComponent(transferId)}/forward`, pharmacyData);
     return res.data;
   },
 
