@@ -4,6 +4,7 @@ import {
   Truck, CheckCircle2, ArrowLeft, Package, ArrowRight, Clock,
   Loader2, Send, RotateCcw, Building2, Link2, Store, AlertCircle,
   RefreshCw, Search, Unlink, ShieldCheck, Users, ChevronRight,
+  XCircle, AlertTriangle, X,
 } from "lucide-react";
 import Background from "../components/layout/Background";
 import Header from "../components/layout/Header";
@@ -15,15 +16,27 @@ import { supplyChainService } from "../services/supplyChainService";
 import { transferService } from "../services/transferService";
 import toast, { Toaster } from "react-hot-toast";
 
-const TAB = { TRANSFERS: "transfers", MANUFACTURERS: "manufacturers", PHARMACIES: "pharmacies" };
+const TAB = {
+  TRANSFERS: "transfers",
+  INVENTORY: "inventory",
+  MANUFACTURERS: "manufacturers",
+  PHARMACIES: "pharmacies",
+};
 
 export default function Distributor() {
-  const { transfers, confirmTransfer, forwardToPharmacy, user } = useApp();
+  const { transfers, confirmTransfer, rejectTransfer, forwardToPharmacy, loadTransfers, user } = useApp();
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState(TAB.TRANSFERS);
   const [confirming, setConfirming] = useState(null);
   const [forwarding, setForwarding] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Reject modal state
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectingTransfer, setRejectingTransfer] = useState(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectSubmitting, setRejectSubmitting] = useState(false);
 
   // Manufacturer directory
   const [manufacturers, setManufacturers] = useState([]);
@@ -116,10 +129,52 @@ export default function Distributor() {
     try {
       await confirmTransfer(id);
       toast.success("✅ Manufacturer → Distributor recorded on blockchain & MongoDB!");
+      if (loadTransfers) await loadTransfers();
     } catch (err) {
       toast.error(err.message || "Failed to confirm transfer");
     } finally {
       setConfirming(null);
+    }
+  };
+
+  // ── Reject Transfer ───────────────────────────────────────────────────
+  const openRejectModal = (transfer) => {
+    setRejectingTransfer(transfer);
+    setRejectReason("");
+    setShowRejectModal(true);
+  };
+
+  const handleReject = async () => {
+    if (!rejectingTransfer) return;
+    if (!rejectReason.trim()) {
+      toast.error("Please provide a rejection reason");
+      return;
+    }
+    setRejectSubmitting(true);
+    try {
+      await rejectTransfer(rejectingTransfer.id, rejectReason.trim());
+      toast.success("Transfer rejected. Manufacturer has been notified.");
+      setShowRejectModal(false);
+      setRejectingTransfer(null);
+      setRejectReason("");
+      if (loadTransfers) await loadTransfers();
+    } catch (err) {
+      toast.error(err.message || "Failed to reject transfer");
+    } finally {
+      setRejectSubmitting(false);
+    }
+  };
+
+  // ── Refresh Transfers ────────────────────────────────────────────────
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      if (loadTransfers) await loadTransfers();
+      toast.success("Transfers refreshed");
+    } catch {
+      toast.error("Failed to refresh transfers");
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -141,6 +196,7 @@ export default function Distributor() {
       toast.success("✅ Distributor → Pharmacy recorded on blockchain & MongoDB!");
       setShowForwardModal(null);
       setSelectedPharmacy(null);
+      if (loadTransfers) await loadTransfers();
     } catch (err) {
       toast.error(err.message || "Failed to forward batch to pharmacy");
     } finally {
@@ -149,12 +205,15 @@ export default function Distributor() {
   };
 
   /* Status helpers */
-  const isPending = (t) => t.blockchainStatus === "Pending Confirmation";
-  const isConfirmed = (t) => t.blockchainStatus === "Confirmed";
-  const isForwarded = (t) => t.blockchainStatus === "Forwarded to Pharmacy";
+  const isPending = (t) => t.blockchainStatus === "Pending Confirmation" || t.status === "Pending Confirmation";
+  const isConfirmed = (t) => t.blockchainStatus === "Confirmed" || t.status === "Confirmed";
+  const isForwarded = (t) => t.blockchainStatus === "Forwarded to Pharmacy" || t.status === "Forwarded to Pharmacy";
+  const isRejected = (t) => t.blockchainStatus === "Rejected" || t.status === "Rejected";
 
   const statusColor = (t) =>
-    isForwarded(t)
+    isRejected(t)
+      ? { text: "#991B1B", bg: "#FEF2F2", border: "rgba(239,68,68,0.3)" }
+      : isForwarded(t)
       ? { text: "#065F46", bg: "#F0FDF4", border: "rgba(16,185,129,0.3)" }
       : isConfirmed(t)
       ? { text: "#0284C7", bg: "#F0F9FF", border: "rgba(2,132,199,0.3)" }
@@ -162,11 +221,12 @@ export default function Distributor() {
 
   const tabStyle = (id) => ({
     flex: 1,
+    minWidth: 160,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     gap: 7,
-    padding: "10px 8px",
+    padding: "10px 12px",
     borderRadius: 8,
     border: "none",
     cursor: "pointer",
@@ -204,7 +264,7 @@ export default function Distributor() {
               Distributor Dashboard
             </h1>
             <p style={{ fontSize: 13, color: "#64748B", marginTop: 2 }}>
-              {user?.companyName || user?.company || user?.name} &nbsp;·&nbsp; Link manufacturers, manage transfers, supply pharmacies
+              {user?.companyName || user?.company || user?.name} &nbsp;·&nbsp; Receive transfers, manage inventory, supply pharmacies
             </p>
           </div>
         </div>
@@ -214,18 +274,19 @@ export default function Distributor() {
           <span style={{ fontSize: 16 }}>🔒</span>
           <div style={{ fontSize: 13, color: "#475569", lineHeight: 1.6 }}>
             <strong style={{ color: "#0284C7" }}>Distributor workflow:</strong>&nbsp;
-            1) Link yourself to an approved <strong>Manufacturer</strong> to receive their batches.&nbsp;
-            2) Link yourself to <strong>Pharmacies</strong> you supply.&nbsp;
-            3) <strong>Confirm</strong> incoming batches and <strong>Forward</strong> them to linked pharmacies.
+            1) Receive incoming transfers dispatched by approved <strong>Manufacturers</strong>.&nbsp;
+            2) <strong>Accept</strong> or <strong>Reject</strong> transfers with real-time blockchain proof.&nbsp;
+            3) Forward in-stock inventory batches to authorized <strong>Pharmacies</strong>.
           </div>
         </div>
 
         {/* Stats */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 32 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 32 }}>
           {[
             { label: "Pending Transfers", value: transfers.filter(isPending).length, color: "#D97706", bg: "rgba(245,158,11,0.08)", icon: Clock },
-            { label: "Confirmed Receipt", value: transfers.filter(isConfirmed).length, color: "#0284C7", bg: "rgba(2,132,199,0.08)", icon: CheckCircle2 },
+            { label: "In Stock / Received", value: transfers.filter(isConfirmed).length, color: "#0284C7", bg: "rgba(2,132,199,0.08)", icon: CheckCircle2 },
             { label: "Forwarded to Pharm", value: transfers.filter(isForwarded).length, color: "#059669", bg: "rgba(5,150,105,0.08)", icon: Send },
+            { label: "Rejected Transfers", value: transfers.filter(isRejected).length, color: "#DC2626", bg: "rgba(239,68,68,0.08)", icon: AlertCircle },
           ].map(({ label, value, color, bg, icon: Icon }) => (
             <div key={label} className="stat-card" style={{ transition: "all 0.3s ease" }}>
               <div style={{ width: 42, height: 42, borderRadius: 12, background: bg, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
@@ -238,9 +299,12 @@ export default function Distributor() {
         </div>
 
         {/* Tab Navigation */}
-        <div style={{ display: "flex", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 14, padding: 5, marginBottom: 28, gap: 4 }}>
+        <div style={{ display: "flex", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 14, padding: 5, marginBottom: 28, gap: 4, flexWrap: "wrap" }}>
           <button style={tabStyle(TAB.TRANSFERS)} onClick={() => setActiveTab(TAB.TRANSFERS)}>
-            <Package size={15} /> Incoming Transfers
+            <Package size={15} /> Incoming Transfers ({transfers.filter(isPending).length})
+          </button>
+          <button style={tabStyle(TAB.INVENTORY)} onClick={() => setActiveTab(TAB.INVENTORY)}>
+            <ShieldCheck size={15} /> In-Stock Inventory ({transfers.filter(isConfirmed).length})
           </button>
           <button style={tabStyle(TAB.MANUFACTURERS)} onClick={() => setActiveTab(TAB.MANUFACTURERS)}>
             <Building2 size={15} /> Manufacturers Directory
@@ -253,23 +317,33 @@ export default function Distributor() {
         {/* ── Tab: Incoming Transfers ── */}
         {activeTab === TAB.TRANSFERS && (
           <div>
-            <h2 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 14, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: "#64748B", marginBottom: 16 }}>
-              Incoming Transfers ({transfers.length})
-            </h2>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+              <h2 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 14, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: "#64748B", margin: 0 }}>
+                Incoming Transfers ({transfers.length})
+              </h2>
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, border: "1px solid #E2E8F0", background: "#FFFFFF", color: "#0284C7", fontSize: 12, fontWeight: 700, cursor: "pointer", boxShadow: "0 1px 3px rgba(0,0,0,0.03)" }}
+              >
+                <RefreshCw size={13} style={{ animation: refreshing ? "spin 1s linear infinite" : "none" }} />
+                Refresh Transfers
+              </button>
+            </div>
 
             {transfers.length === 0 ? (
               <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 18, padding: "48px 28px", textAlign: "center" }}>
                 <Package size={40} color="#CBD5E1" style={{ margin: "0 auto 16px" }} />
                 <div style={{ fontSize: 16, fontWeight: 700, color: "#475569", marginBottom: 8 }}>No incoming transfers yet</div>
                 <div style={{ fontSize: 13, color: "#94A3B8" }}>
-                  First, link yourself to a Manufacturer. Once they register a medicine batch, you'll see it here.
+                  Transfers dispatched by Manufacturers addressed to your account will appear here in real-time.
                 </div>
                 <button
-                  onClick={() => setActiveTab(TAB.MANUFACTURERS)}
+                  onClick={handleRefresh}
                   style={{ marginTop: 20, padding: "10px 24px", borderRadius: 10, background: "#0284C7", color: "#FFFFFF", border: "none", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
                 >
-                  <Building2 size={14} style={{ verticalAlign: "middle", marginRight: 6 }} />
-                  Browse Manufacturers
+                  <RefreshCw size={14} style={{ verticalAlign: "middle", marginRight: 6 }} />
+                  Check for Transfers
                 </button>
               </div>
             ) : (
@@ -298,7 +372,7 @@ export default function Distributor() {
                             <Package size={18} color="#0284C7" />
                             <span style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 16, color: "#0F172A" }}>{t.medicineName}</span>
                             <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: c.text, background: c.bg, border: `1px solid ${c.border}`, padding: "3px 10px", borderRadius: 100 }}>
-                              {t.blockchainStatus}
+                              {t.blockchainStatus || t.status}
                             </span>
                           </div>
 
@@ -316,6 +390,18 @@ export default function Distributor() {
                               </div>
                             ))}
                           </div>
+
+                          {t.notes && (
+                            <div style={{ marginTop: 12, fontSize: 12, color: "#64748B", background: "#F8FAFC", padding: "6px 12px", borderRadius: 8, border: "1px solid #E2E8F0" }}>
+                              <strong>Notes:</strong> {t.notes}
+                            </div>
+                          )}
+
+                          {isRejected(t) && t.rejectionReason && (
+                            <div style={{ marginTop: 12, fontSize: 12, color: "#991B1B", background: "#FEF2F2", padding: "8px 12px", borderRadius: 8, border: "1px solid #FECACA" }}>
+                              <strong>Rejection Reason:</strong> {t.rejectionReason}
+                            </div>
+                          )}
 
                           {/* Chain badges */}
                           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
@@ -344,15 +430,24 @@ export default function Distributor() {
                         {/* Action buttons */}
                         <div style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 180 }}>
                           {isPending(t) && (
-                            <button
-                              id={`confirm-btn-${t.id}`}
-                              className="btn-green"
-                              onClick={() => handleConfirm(t.id)}
-                              disabled={confirming === t.id}
-                              style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "center", padding: "10px 20px", fontSize: 13 }}
-                            >
-                              {confirming === t.id ? <><Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> Confirming...</> : <><CheckCircle2 size={14} /> Confirm Received</>}
-                            </button>
+                            <>
+                              <button
+                                id={`confirm-btn-${t.id}`}
+                                className="btn-green"
+                                onClick={() => handleConfirm(t.id)}
+                                disabled={confirming === t.id}
+                                style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "center", padding: "10px 20px", fontSize: 13 }}
+                              >
+                                {confirming === t.id ? <><Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> Confirming...</> : <><CheckCircle2 size={14} /> Accept & Confirm</>}
+                              </button>
+                              <button
+                                id={`reject-btn-${t.id}`}
+                                onClick={() => openRejectModal(t)}
+                                style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center", padding: "9px 16px", fontSize: 12, borderRadius: 10, border: "1px solid #FECACA", background: "#FEF2F2", color: "#DC2626", fontWeight: 700, cursor: "pointer", transition: "all 0.2s" }}
+                              >
+                                <XCircle size={14} /> Reject Transfer
+                              </button>
+                            </>
                           )}
 
                           {isConfirmed(t) && (
@@ -372,11 +467,102 @@ export default function Distributor() {
                               ✓ Forwarded to Pharmacy
                             </div>
                           )}
+
+                          {isRejected(t) && (
+                            <div style={{ padding: "10px 16px", borderRadius: 10, background: "#FEF2F2", border: "1px solid rgba(239,68,68,0.3)", fontSize: 12, fontWeight: 700, color: "#991B1B", textAlign: "center" }}>
+                              ✗ Rejected
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
                   );
                 })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Tab: In-Stock Inventory ── */}
+        {activeTab === TAB.INVENTORY && (
+          <div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+              <div>
+                <h2 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 14, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: "#64748B", margin: 0 }}>
+                  Confirmed Inventory Batches ({transfers.filter(isConfirmed).length})
+                </h2>
+                <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>
+                  Medicines successfully received and confirmed on the DrugChain ledger
+                </p>
+              </div>
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, border: "1px solid #E2E8F0", background: "#FFFFFF", color: "#0284C7", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+              >
+                <RefreshCw size={13} style={{ animation: refreshing ? "spin 1s linear infinite" : "none" }} />
+                Refresh
+              </button>
+            </div>
+
+            {transfers.filter(isConfirmed).length === 0 ? (
+              <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 18, padding: "48px 28px", textAlign: "center" }}>
+                <ShieldCheck size={40} color="#CBD5E1" style={{ margin: "0 auto 16px" }} />
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#475569", marginBottom: 8 }}>No confirmed stock in inventory</div>
+                <div style={{ fontSize: 13, color: "#94A3B8" }}>
+                  When you accept and confirm incoming transfers, they will be tracked in your active inventory.
+                </div>
+                <button
+                  onClick={() => setActiveTab(TAB.TRANSFERS)}
+                  style={{ marginTop: 20, padding: "10px 24px", borderRadius: 10, background: "#0284C7", color: "#FFFFFF", border: "none", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+                >
+                  View Pending Transfers ({transfers.filter(isPending).length})
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 20 }}>
+                {transfers.filter(isConfirmed).map((t) => (
+                  <div key={t.id} style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 18, padding: 22, boxShadow: "0 4px 16px rgba(0,0,0,0.02)" }}>
+                    {(t.imageUrl || t.medicineImage) && (
+                      <div style={{ marginBottom: 14, borderRadius: 12, overflow: "hidden", border: "1px solid #E2E8F0" }}>
+                        <MedicineImage src={t.imageUrl || t.medicineImage} alt={t.medicineName} style={{ height: 130 }} />
+                      </div>
+                    )}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                      <span style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "#0284C7", background: "#F0F9FF", padding: "4px 10px", borderRadius: 100, border: "1px solid rgba(2,132,199,0.25)" }}>
+                        IN STOCK
+                      </span>
+                      <ShieldCheck size={16} color="#0284C7" />
+                    </div>
+                    <h3 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 16, fontWeight: 800, color: "#0F172A", marginBottom: 8 }}>{t.medicineName}</h3>
+                    <div style={{ display: "grid", gap: 6, marginBottom: 16 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                        <span style={{ color: "#94A3B8", fontWeight: 700 }}>BATCH ID:</span>
+                        <span style={{ fontFamily: "monospace", fontWeight: 700, color: "#1E293B" }}>{t.batchId}</span>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                        <span style={{ color: "#94A3B8", fontWeight: 700 }}>QUANTITY:</span>
+                        <span style={{ fontWeight: 700, color: "#0284C7" }}>{t.quantity}</span>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                        <span style={{ color: "#94A3B8", fontWeight: 700 }}>MANUFACTURER:</span>
+                        <span style={{ fontWeight: 600, color: "#334155" }}>{t.from}</span>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                        <span style={{ color: "#94A3B8", fontWeight: 700 }}>CONFIRMED AT:</span>
+                        <span style={{ fontSize: 11, color: "#64748B" }}>{t.confirmedAt || t.timestamp}</span>
+                      </div>
+                    </div>
+                    <button
+                      className="btn-primary"
+                      onClick={() => openForwardModal(t.id)}
+                      disabled={forwarding === t.id}
+                      style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, justifyContent: "center", padding: "10px", fontSize: 13 }}
+                    >
+                      <Truck size={14} /> Forward to Pharmacy
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -612,6 +798,66 @@ export default function Distributor() {
                   </div>
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Reject Modal ── */}
+      {showRejectModal && rejectingTransfer && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div style={{ background: "#FFFFFF", borderRadius: 20, maxWidth: 480, width: "100%", padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.15)", position: "relative" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 12, background: "#FEF2F2", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <AlertTriangle size={20} color="#DC2626" />
+                </div>
+                <div>
+                  <h3 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 17, fontWeight: 800, color: "#0F172A", margin: 0 }}>
+                    Reject Medicine Transfer
+                  </h3>
+                  <p style={{ fontSize: 12, color: "#64748B", margin: 0 }}>
+                    Batch: {rejectingTransfer.batchId} ({rejectingTransfer.medicineName})
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setShowRejectModal(false); setRejectingTransfer(null); }}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: 13, color: "#475569", lineHeight: 1.5, marginBottom: 16 }}>
+              Please state why this batch is being rejected. The Manufacturer ({rejectingTransfer.from}) will be notified and this action will be permanently recorded.
+            </p>
+
+            <label style={{ display: "block", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#64748B", marginBottom: 6 }}>
+              Rejection Reason *
+            </label>
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="e.g. Packaging damaged, quantity mismatch, wrong specification, or compliance concern..."
+              rows={3}
+              style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #E2E8F0", fontSize: 13, fontFamily: "'Plus Jakarta Sans', sans-serif", outline: "none", marginBottom: 20, resize: "vertical" }}
+            />
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={() => { setShowRejectModal(false); setRejectingTransfer(null); }}
+                style={{ flex: 1, padding: "11px", borderRadius: 10, border: "1px solid #E2E8F0", background: "#FFFFFF", fontWeight: 700, cursor: "pointer", fontSize: 13 }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReject}
+                disabled={rejectSubmitting || !rejectReason.trim()}
+                style={{ flex: 2, padding: "11px", borderRadius: 10, background: rejectReason.trim() ? "#DC2626" : "#CBD5E1", color: "#FFF", border: "none", fontWeight: 700, fontSize: 13, cursor: rejectReason.trim() ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+              >
+                {rejectSubmitting ? <><Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> Rejecting...</> : <><XCircle size={14} /> Confirm Rejection</>}
+              </button>
             </div>
           </div>
         </div>

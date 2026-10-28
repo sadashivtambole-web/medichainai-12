@@ -3178,6 +3178,192 @@ router.get("/medicines/:id", verifyToken, async (req, res) => {
 /* ══════════════════════════════════════════════════════════════════════
    4. DISTRIBUTOR & PHARMACY TRANSFERS (ISOLATED SUPPLY CHAIN)
 ══════════════════════════════════════════════════════════════════════ */
+
+// 4.1 Manufacturer initiates transfer of an approved medicine to a Distributor
+router.post("/transfers", verifyToken, requireRole("Manufacturer", "Creator"), validate(schemas.createTransfer), async (req, res) => {
+  try {
+    const { medicineId, distributorId, notes } = req.body;
+    const quantityNum = parseInt(req.body.quantity, 10);
+
+    if (isNaN(quantityNum) || quantityNum <= 0) {
+      return sendError(res, "Quantity must be a positive integer", "INVALID_QUANTITY", 400);
+    }
+
+    // 1. Locate Medicine
+    const rawMedId = (medicineId || "").trim();
+    const safeMedId = escapeRegex(rawMedId);
+    const queryConditions = [
+      { id: new RegExp(`^${safeMedId}$`, "i") },
+      { batchId: new RegExp(`^${safeMedId}$`, "i") },
+    ];
+    if (mongoose.isValidObjectId(rawMedId)) {
+      queryConditions.push({ _id: rawMedId });
+    }
+    const medicine = await Medicine.findOne({ $or: queryConditions });
+    if (!medicine) {
+      return sendError(res, "Medicine not found", "MEDICINE_NOT_FOUND", 404);
+    }
+
+    // 2. Enforce Approval Check
+    if (medicine.approvalStatus !== "approved" && req.user.role !== "Creator") {
+      return sendError(
+        res,
+        `Cannot transfer medicine with approval status '${medicine.approvalStatus || "pending"}'. Only approved medicines may be transferred.`,
+        "MEDICINE_NOT_APPROVED",
+        400
+      );
+    }
+
+    // 3. Authorization Check
+    if (req.user.role !== "Creator") {
+      const isMfr = medicine.manufacturerId && medicine.manufacturerId.toString() === req.user._id.toString();
+      const isOwner = medicine.currentOwnerId && medicine.currentOwnerId.toString() === req.user._id.toString();
+      if (!isMfr && !isOwner) {
+        return sendError(res, "Access denied: You are not authorized to transfer this medicine batch.", "FORBIDDEN", 403);
+      }
+    }
+
+    // 4. Quantity / Inventory Validation
+    const availableQty = typeof medicine.quantity === "number" ? medicine.quantity : 1000;
+    if (quantityNum > availableQty) {
+      return sendError(
+        res,
+        `Requested transfer quantity (${quantityNum}) exceeds available inventory (${availableQty} units).`,
+        "INSUFFICIENT_INVENTORY",
+        400
+      );
+    }
+
+    // 5. Target Distributor Validation
+    const targetUser = await User.findById(distributorId);
+    if (!targetUser || (targetUser.role !== "Distributor" && targetUser.role !== "distributor")) {
+      return sendError(res, "Target distributor not found or invalid role", "INVALID_DISTRIBUTOR", 404);
+    }
+    if (targetUser.accountStatus !== "APPROVED") {
+      return sendError(res, "Selected distributor account is not approved for supply-chain transfers.", "DISTRIBUTOR_NOT_APPROVED", 400);
+    }
+
+    const distProfile = await getProfileForUser(targetUser);
+    const toDistName = (distProfile?.companyName || targetUser.company || targetUser.name || "Distributor").trim();
+
+    const mfrProfile = req.userProfile || await getProfileForUser(req.user);
+    const fromMfrName = (mfrProfile?.companyName || req.user.company || medicine.company || medicine.manufacturer || "Manufacturer").trim();
+
+    // 6. Create SupplyChainTransaction
+    const transferId = `TR-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
+    const ts = new Date().toLocaleString("en-IN");
+
+    const newTransfer = new SupplyChainTransaction({
+      id: transferId,
+      transferId,
+      medicineId: medicine.id,
+      medicineName: medicine.name,
+      batchId: medicine.batchId,
+      fromUserId: req.user._id,
+      fromRole: "Manufacturer",
+      from: fromMfrName,
+      toUserId: targetUser._id,
+      toRole: "Distributor",
+      to: toDistName,
+      quantity: `${quantityNum} Units`,
+      timestamp: ts,
+      action: "TRANSFERRED",
+      status: "Pending Confirmation",
+      blockchainStatus: "Pending Confirmation",
+      notes: (notes || "").trim(),
+    });
+    await newTransfer.save();
+
+    // 7. Update Medicine History & Inventory Stock
+    medicine.transferHistory.push({
+      step: 1.5,
+      role: "Manufacturer",
+      actor: fromMfrName,
+      timestamp: ts,
+      status: `Dispatched to Distributor (${toDistName}) - Pending Confirmation`,
+      txHash: null,
+    });
+    medicine.currentHolder = `Dispatched to ${toDistName}`;
+    if (typeof medicine.quantity === "number") {
+      medicine.quantity = Math.max(0, medicine.quantity - quantityNum);
+    }
+    await medicine.save();
+
+    // 8. In-App Notification to Distributor
+    try {
+      await Notification.create({
+        userId: targetUser._id,
+        title: "New Incoming Medicine Transfer",
+        message: `${fromMfrName} has dispatched ${quantityNum} Units of ${medicine.name} (Batch: ${medicine.batchId}) to your organization.`,
+        type: "TRANSFER",
+      });
+    } catch (notifErr) {}
+
+    // 9. Record AuditLog
+    try {
+      await AuditLog.create({
+        userId: req.user._id,
+        email: req.user.email,
+        role: req.user.role,
+        action: "TRANSFER_CREATED",
+        resource: "SupplyChainTransaction",
+        resourceId: transferId,
+        ipAddress: req.ip || "127.0.0.1",
+        result: "SUCCESS",
+        details: { batchId: medicine.batchId, toDistName, quantity: quantityNum },
+      });
+    } catch (auditErr) {}
+
+    const responsePayload = {
+      ...newTransfer.toObject(),
+      availableStockAfterTransfer: medicine.quantity,
+    };
+
+    return sendSuccess(res, responsePayload, "Transfer initiated successfully! Pending Distributor confirmation.", 201);
+  } catch (err) {
+    return sendError(res, err.message, "TRANSFER_CREATION_FAILED", 500);
+  }
+});
+
+// 4.2 Manufacturer views outgoing transfers
+router.get("/transfers/outgoing", verifyToken, requireRole("Manufacturer", "Creator"), async (req, res) => {
+  try {
+    let query = {};
+    if (req.user.role === "Creator") {
+      query = { fromRole: "Manufacturer" };
+    } else {
+      query = { fromUserId: req.user._id };
+    }
+
+    const rawTransfers = await SupplyChainTransaction.find(query).sort({ createdAt: -1 });
+
+    // Enrich each transfer with medicine details & image
+    const batchIds = [...new Set(rawTransfers.map((t) => t.batchId).filter(Boolean))];
+    const medicines = await Medicine.find(
+      { batchId: { $in: batchIds } },
+      { batchId: 1, medicineImage: 1, manufacturingDate: 1, expiryDate: 1, approvalStatus: 1, composition: 1 }
+    );
+    const medicineMap = Object.fromEntries(medicines.map((m) => [m.batchId, m]));
+
+    const transfers = rawTransfers.map((t) => {
+      const med = medicineMap[t.batchId];
+      const plain = t.toObject ? t.toObject() : { ...t };
+      return {
+        ...plain,
+        medicineImage: med?.medicineImage || null,
+        manufacturingDate: plain.manufacturingDate || med?.manufacturingDate || null,
+        expiryDate: plain.expiryDate || med?.expiryDate || null,
+        composition: med?.composition || "",
+        approvalStatus: med?.approvalStatus || "approved",
+      };
+    });
+
+    return sendSuccess(res, transfers, "Outgoing transfers retrieved");
+  } catch (err) {
+    return sendError(res, err.message, "OUTGOING_TRANSFERS_FAILED", 500);
+  }
+});
+
 router.get("/transfers/incoming", verifyToken, requireRole("Distributor", "Pharmacy", "Creator"), async (req, res) => {
   try {
     const role = (req.user.role || "").toLowerCase();
@@ -3280,9 +3466,12 @@ router.post("/transfers/:id/confirm", verifyToken, requireRole("Distributor", "C
       }
     }
 
-    // 2. State check: prevent duplicate confirmation
+    // 2. State check: prevent duplicate confirmation or confirming rejected transfer
     if (transfer.status === "Confirmed" || transfer.action === "CONFIRMED") {
       return sendError(res, "Transfer has already been confirmed.", "ALREADY_CONFIRMED", 400);
+    }
+    if (transfer.status === "Rejected" || transfer.action === "REJECTED") {
+      return sendError(res, "Cannot confirm a rejected transfer.", "ALREADY_REJECTED", 400);
     }
 
     // 3. Approval check: ensure medicine batch is approved
@@ -3342,6 +3531,18 @@ router.post("/transfers/:id/confirm", verifyToken, requireRole("Distributor", "C
       });
     } catch (bcErr) {}
 
+    // In-App Notification to Manufacturer
+    if (transfer.fromUserId) {
+      try {
+        await Notification.create({
+          userId: transfer.fromUserId,
+          title: "Transfer Confirmed by Distributor",
+          message: `${actor} has accepted transfer ${transfer.id} for batch ${transfer.batchId}.`,
+          type: "TRANSFER",
+        });
+      } catch (notifErr) {}
+    }
+
     // Record AuditLog
     try {
       await AuditLog.create({
@@ -3360,6 +3561,96 @@ router.post("/transfers/:id/confirm", verifyToken, requireRole("Distributor", "C
     return sendSuccess(res, transfer, "Transfer confirmed and recorded on DrugChain");
   } catch (err) {
     return sendError(res, err.message, "CONFIRM_FAILED", 500);
+  }
+});
+
+// 4.4 Distributor Rejects Transfer
+router.post("/transfers/:id/reject", verifyToken, requireRole("Distributor", "Creator"), validate(schemas.rejectTransfer), async (req, res) => {
+  try {
+    const transferId = req.params.id;
+    const transfer = await SupplyChainTransaction.findOne({
+      $or: [{ id: transferId }, { transferId }],
+    });
+    if (!transfer) {
+      return sendError(res, "Transfer not found", "NOT_FOUND", 404);
+    }
+
+    const userProfile = req.userProfile || await getProfileForUser(req.user);
+    const actor = userProfile?.companyName || req.user.company || "ABC Distributors";
+
+    // RBAC check: ensure this transfer is addressed to this distributor
+    if (req.user.role !== "Creator") {
+      const isTargetUser = transfer.toUserId && transfer.toUserId.toString() === req.user._id.toString();
+      const isTargetActor = transfer.to && actor && transfer.to.toLowerCase() === actor.toLowerCase();
+      if (transfer.toUserId && !isTargetUser && !isTargetActor) {
+        return sendError(res, "Access denied: This transfer is addressed to another distributor.", "FORBIDDEN", 403);
+      }
+    }
+
+    // State check
+    if (transfer.status === "Confirmed" || transfer.action === "CONFIRMED") {
+      return sendError(res, "Cannot reject an already confirmed transfer.", "ALREADY_CONFIRMED", 400);
+    }
+    if (transfer.status === "Rejected" || transfer.action === "REJECTED") {
+      return sendError(res, "Transfer has already been rejected.", "ALREADY_REJECTED", 400);
+    }
+
+    const rejectionReason = (req.body.rejectionReason || req.body.reason || "Rejected by distributor").trim();
+    const ts = new Date().toLocaleString("en-IN");
+
+    transfer.status = "Rejected";
+    transfer.action = "REJECTED";
+    transfer.blockchainStatus = "Rejected";
+    transfer.rejectionReason = rejectionReason;
+    transfer.rejectedAt = ts;
+    transfer.rejectedBy = req.user._id;
+    await transfer.save();
+
+    // Reconcile medicine holder back to Manufacturer
+    const medicine = await Medicine.findOne({ batchId: transfer.batchId });
+    if (medicine) {
+      medicine.currentHolder = medicine.company || medicine.manufacturer || "Manufacturer";
+      medicine.transferHistory.push({
+        step: 2,
+        role: "Distributor",
+        actor,
+        timestamp: ts,
+        status: `Rejected by Distributor: ${rejectionReason}`,
+        txHash: null,
+      });
+      await medicine.save();
+    }
+
+    // Notify Manufacturer
+    if (transfer.fromUserId) {
+      try {
+        await Notification.create({
+          userId: transfer.fromUserId,
+          title: "Transfer Rejected by Distributor",
+          message: `${actor} rejected transfer ${transfer.id} for batch ${transfer.batchId}. Reason: ${rejectionReason}`,
+          type: "WARNING",
+        });
+      } catch (notifErr) {}
+    }
+
+    // Record AuditLog
+    try {
+      await AuditLog.create({
+        userId: req.user._id,
+        email: req.user.email,
+        role: req.user.role,
+        action: "TRANSFER_REJECTED",
+        resource: "SupplyChainTransaction",
+        resourceId: transfer.id,
+        ipAddress: req.ip || "127.0.0.1",
+        result: "SUCCESS",
+        details: { batchId: transfer.batchId, actor, rejectionReason },
+      });
+    } catch (auditErr) {}
+
+    return sendSuccess(res, transfer, "Transfer rejected. Manufacturer has been notified.");
+  } catch (err) {
+    return sendError(res, err.message, "REJECT_FAILED", 500);
   }
 });
 
@@ -3610,6 +3901,31 @@ router.post("/pharmacy/:medicineId/confirm", verifyToken, requireRole("Pharmacy"
     return sendSuccess(res, medicine, "Pharmacy shelf receipt confirmed on DrugChain");
   } catch (err) {
     return sendError(res, err.message, "PHARMACY_CONFIRM_FAILED", 500);
+  }
+});
+
+// 4.6 Notifications
+router.get("/notifications", verifyToken, async (req, res) => {
+  try {
+    const notifications = await Notification.find({ userId: req.user._id })
+      .sort({ createdAt: -1 })
+      .limit(50);
+    return sendSuccess(res, notifications, "Notifications retrieved");
+  } catch (err) {
+    return sendError(res, err.message, "NOTIFICATIONS_FETCH_FAILED", 500);
+  }
+});
+
+router.patch("/notifications/:id/read", verifyToken, async (req, res) => {
+  try {
+    const notif = await Notification.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user._id },
+      { read: true },
+      { new: true }
+    );
+    return sendSuccess(res, notif, "Notification marked as read");
+  } catch (err) {
+    return sendError(res, err.message, "UPDATE_FAILED", 500);
   }
 });
 

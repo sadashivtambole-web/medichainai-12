@@ -388,23 +388,26 @@ const SupplyChainTransactionSchema = new mongoose.Schema(
     // Custody State Lifecycle
     action: {
       type: String,
-      enum: ["REGISTERED", "TRANSFERRED", "FORWARDED", "RECEIVED", "CONFIRMED"],
+      enum: ["REGISTERED", "TRANSFERRED", "FORWARDED", "RECEIVED", "CONFIRMED", "REJECTED"],
       default: "TRANSFERRED",
     },
     status: {
       type: String,
-      enum: ["Pending Confirmation", "Confirmed", "Forwarded to Pharmacy", "Received", "Stocked"],
+      enum: ["Pending Confirmation", "Confirmed", "Forwarded to Pharmacy", "Received", "Stocked", "Rejected"],
       default: "Pending Confirmation",
     },
     blockchainStatus: {
       type: String,
-      enum: ["Pending Confirmation", "Confirmed", "Forwarded to Pharmacy", "Received"],
+      enum: ["Pending Confirmation", "Confirmed", "Forwarded to Pharmacy", "Received", "Rejected"],
       default: "Pending Confirmation",
     },
     confirmTxHash: { type: String, default: null },
     confirmedAt: { type: String, default: null },
     forwardTxHash: { type: String, default: null },
     forwardedAt: { type: String, default: null },
+    rejectionReason: { type: String, default: "" },
+    rejectedAt: { type: String, default: null },
+    rejectedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     notes: { type: String, default: "" },
   },
   { timestamps: true, collection: "supplyChainTransactions" }

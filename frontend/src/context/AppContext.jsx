@@ -206,6 +206,37 @@ export function AppProvider({ children }) {
     return await verificationService.verifyPublicCode(code);
   };
 
+  const loadTransfers = async () => {
+    try {
+      const trans = await transferService.getIncomingTransfers();
+      setTransfers(trans || []);
+      return trans;
+    } catch (e) {
+      return [];
+    }
+  };
+
+  const loadMedicines = async () => {
+    try {
+      const meds = await medicineService.getAllMedicines();
+      setMedicines(meds || []);
+      return meds;
+    } catch (e) {
+      return [];
+    }
+  };
+
+  /* ── Distributor Action: Reject Transfer on Real Backend ── */
+  const rejectTransfer = async (transferId, rejectionReason = "") => {
+    const rejectedTransfer = await transferService.rejectTransfer(transferId, rejectionReason);
+    if (rejectedTransfer) {
+      setTransfers((prev) =>
+        prev.map((t) => (t.id === transferId ? { ...t, ...rejectedTransfer, status: "Rejected", blockchainStatus: "Rejected" } : t))
+      );
+      return rejectedTransfer;
+    }
+  };
+
   /* ── Local query helper ── */
   const getMedicineById = (id) =>
     medicines.find(
@@ -234,10 +265,13 @@ export function AppProvider({ children }) {
         setProfileOpen,
         registerMedicine,
         confirmTransfer,
+        rejectTransfer,
         forwardToPharmacy,
         confirmPharmacyReceipt,
         verifyMedicineCode,
         getMedicineById,
+        loadTransfers,
+        loadMedicines,
       }}
     >
       {children}

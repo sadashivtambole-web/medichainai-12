@@ -79,6 +79,18 @@ export const schemas = {
     destinationPharmacy: Joi.string().trim().max(200).allow(""),
   }),
 
+  createTransfer: Joi.object({
+    medicineId: Joi.string().trim().required(),
+    distributorId: Joi.string().trim().required(),
+    quantity: Joi.number().integer().min(1).max(10000000).required(),
+    notes: Joi.string().trim().max(500).allow("").optional(),
+  }),
+
+  rejectTransfer: Joi.object({
+    rejectionReason: Joi.string().trim().min(3).max(1000).allow("").optional(),
+    reason: Joi.string().trim().min(3).max(1000).allow("").optional(),
+  }),
+
   registerMedicine: Joi.object({
     manufacturerName: Joi.string().trim().max(200).allow(""),
     companyName: Joi.string().trim().max(200).allow(""),
