@@ -8113,5 +8113,198 @@
     "hash": "c40aee8d5ac0069c5c3466119dadf73fdfa42935000621b54926bda47ff71d85",
     "merkleRoot": "1ff564fb488f49a7d24b10de2cd53db984c0f4a05026b11f2ab94ce044217d96",
     "validator": "validator-distributor"
+  },
+  {
+    "index": 293,
+    "timestamp": "2026-10-28T05:02:40.204Z",
+    "transactions": [
+      {
+        "transactionId": "tx-066bf9dfe27c7254-mvrneki4",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2026-LCP6O98",
+        "batchNumber": "BT0001",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-10-28T05:02:40.203Z",
+        "dataHash": "3e028c61d29584c25612b68d5411db02fb13d12bdae17aabf1778c8568afa472",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "310351f256ff82989e58a506c43f8638e42a0b57efb5ef3fddb6b6bfd0471fa1",
+          "registeredHash": "310351f256ff82989e58a506c43f8638e42a0b57efb5ef3fddb6b6bfd0471fa1"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "c40aee8d5ac0069c5c3466119dadf73fdfa42935000621b54926bda47ff71d85",
+    "hash": "412dad9fd433b14e65a3b098cd63f3edc462a8c0871d517d2bb8fdd6ff41baf2",
+    "merkleRoot": "c0d14e3091c7ca5bd47ab563cd859852eada9bfea55c66464ff5bfe8d8c4e255",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 294,
+    "timestamp": "2026-10-28T05:07:05.338Z",
+    "transactions": [
+      {
+        "transactionId": "tx-53eedefb8ba2996f-mvrnk92x",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2026-LCP6O98",
+        "batchNumber": "BT0001",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-10-28T05:07:05.337Z",
+        "dataHash": "9d5f551404649ee69ade385bfd0829dc4c75f5a9ad1fc239fa9584a35cba7a9a",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "310351f256ff82989e58a506c43f8638e42a0b57efb5ef3fddb6b6bfd0471fa1",
+          "registeredHash": "310351f256ff82989e58a506c43f8638e42a0b57efb5ef3fddb6b6bfd0471fa1"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "412dad9fd433b14e65a3b098cd63f3edc462a8c0871d517d2bb8fdd6ff41baf2",
+    "hash": "410c7aacd8e12a10367fd486d0982d80eba672e9152d4b077024b2b6d406fc37",
+    "merkleRoot": "280c32cab5ebd64b3156150efb298386e24b94028d3454d614b3709a877c542a",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 295,
+    "timestamp": "2026-10-28T05:08:25.627Z",
+    "transactions": [
+      {
+        "transactionId": "tx-a23a6eb5f25d7e40-mvrnlz17",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2026-LCP6O98",
+        "batchNumber": "BT0001",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-10-28T05:08:25.627Z",
+        "dataHash": "a0d12a3aa0000abe628d483398cce59f62a92a6e03ab0177e285019b3aab179b",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "310351f256ff82989e58a506c43f8638e42a0b57efb5ef3fddb6b6bfd0471fa1",
+          "registeredHash": "310351f256ff82989e58a506c43f8638e42a0b57efb5ef3fddb6b6bfd0471fa1"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "410c7aacd8e12a10367fd486d0982d80eba672e9152d4b077024b2b6d406fc37",
+    "hash": "5bef6be2f469fc5b88dff6ed8bb25b969201aa1c6baabcbdcd24f23eafaf988d",
+    "merkleRoot": "bb8174f0a2f167570709bf4ecb4a52e30d04a50c02009dfccdfb98119233f268",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 296,
+    "timestamp": "2026-10-28T05:13:09.567Z",
+    "transactions": [
+      {
+        "transactionId": "tx-7be0b25140bfbabc-mvrns24f",
+        "type": "MEDICINE_VERIFIED",
+        "medicineId": "MED-2026-LCP6O98",
+        "batchNumber": "BT0001",
+        "from": "Customer Verification Portal",
+        "to": "DrugChain Verification Gate",
+        "timestamp": "2026-10-28T05:13:09.567Z",
+        "dataHash": "9d4104d4dc2970b3c5acb633e21c0ab7da4ee2a3a0a4d7baae0d496fee3a88b6",
+        "metadata": {
+          "verifier": "Customer Verification Portal",
+          "result": "MATCH",
+          "match": true,
+          "submittedHash": "310351f256ff82989e58a506c43f8638e42a0b57efb5ef3fddb6b6bfd0471fa1",
+          "registeredHash": "310351f256ff82989e58a506c43f8638e42a0b57efb5ef3fddb6b6bfd0471fa1"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "5bef6be2f469fc5b88dff6ed8bb25b969201aa1c6baabcbdcd24f23eafaf988d",
+    "hash": "983317e4039f6de106ed849683bd65aaef5834ff9bc04d1398b70240b201571e",
+    "merkleRoot": "a831085a67dea3b55e5ffb8d18c967dd3f2f5fa6ff18cb54511f7121d5d6185b",
+    "validator": "validator-admin"
+  },
+  {
+    "index": 297,
+    "timestamp": "2026-10-28T05:20:51.180Z",
+    "transactions": [
+      {
+        "transactionId": "tx-a62a31d283dbfef4-mvro1yb0",
+        "type": "MEDICINE_REGISTERED",
+        "medicineId": "MED-2026-O1Y8P82",
+        "batchNumber": "BT-FLOW-948904",
+        "from": null,
+        "to": "Apex BioTech Labs 948904",
+        "timestamp": "2026-10-28T05:20:51.180Z",
+        "dataHash": "16ab6bd96ea7332c31ac3514480fc6f4ae481d67acc51eaeb1973b66aedede90",
+        "metadata": {
+          "medicineName": "Paracetamol 650mg Active",
+          "manufacturerCode": "",
+          "manufacturerName": "Apex BioTech Labs 948904",
+          "manufacturingDate": "2026-03-01",
+          "expiryDate": "2028-03-01",
+          "role": "Manufacturer"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "983317e4039f6de106ed849683bd65aaef5834ff9bc04d1398b70240b201571e",
+    "hash": "0f1125fc10d9c55139ad89991bc26d7afcd455afbe4b6847193c40a02cd47547",
+    "merkleRoot": "0d763104102e39c822ca9c31c9ff9aaf93e8ec16e64a4d85d958cd42f1167731",
+    "validator": "validator-authority-root"
+  },
+  {
+    "index": 298,
+    "timestamp": "2026-10-28T05:20:51.443Z",
+    "transactions": [
+      {
+        "transactionId": "tx-297f15ca62f86cf9-mvro1yib",
+        "type": "MEDICINE_TRANSFERRED",
+        "medicineId": "MED-2026-O1Y8P82",
+        "batchNumber": "BT-FLOW-948904",
+        "from": "Apex BioTech Labs 948904",
+        "to": "Alpha Logistics 948904",
+        "timestamp": "2026-10-28T05:20:51.443Z",
+        "dataHash": "20c4b318a00724e6ae6f1277fa664dbce18aa7171aa26cb6f9d9c50431246c1c",
+        "metadata": {
+          "fromRole": "Manufacturer",
+          "toRole": "Distributor",
+          "action": "TRANSFER_DISPATCHED"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "0f1125fc10d9c55139ad89991bc26d7afcd455afbe4b6847193c40a02cd47547",
+    "hash": "1aae06e054bedc8ce9b51e67c6d0e4a8d5143d8aa70f168a0ef24abec96e3e87",
+    "merkleRoot": "0f51b70dac3d6a01d9f71c9e1d07f2422327f23c9045c5ee4403cc4efee886b4",
+    "validator": "validator-distributor"
+  },
+  {
+    "index": 299,
+    "timestamp": "2026-10-28T05:26:44.652Z",
+    "transactions": [
+      {
+        "transactionId": "tx-75583c1b6b16b9f3-mvro9j1o",
+        "type": "RECEIPT_CONFIRMED",
+        "medicineId": "MED-2026-LCP6O98",
+        "batchNumber": "BT0001",
+        "from": "yyutyp",
+        "to": "yyutyp",
+        "timestamp": "2026-10-28T05:26:44.652Z",
+        "dataHash": "330de1c846f4a20fcc86dce5a5a383a7f24395dd5956b071a07eee6d841e36ce",
+        "metadata": {
+          "actor": "yyutyp",
+          "role": "Pharmacy",
+          "action": "CUSTODY_CONFIRMED"
+        },
+        "status": "CONFIRMED"
+      }
+    ],
+    "previousHash": "1aae06e054bedc8ce9b51e67c6d0e4a8d5143d8aa70f168a0ef24abec96e3e87",
+    "hash": "1a7868bd5f863291ca71bf141f3a5061c9fb2f160120c94f865d1e3b357a4090",
+    "merkleRoot": "3a2266ba871f05a858ff752514c30db81a8481ad44e9f82a517ad19a285956e4",
+    "validator": "validator-pharmacy"
   }
 ]

@@ -3824,19 +3824,20 @@ router.post("/pharmacy/:medicineId/confirm", verifyToken, requireRole("Pharmacy"
     const pharmacyActor = userProfile?.pharmacyName || userProfile?.companyName || req.user.company || "City Pharmacy (POS)";
     const safePharmacyActor = escapeRegex(pharmacyActor);
 
-    // RBAC: Verify that this batch was dispatched to this pharmacy
+    // RBAC: Verify that this batch was dispatched to this pharmacy or is eligible for pharmacy receipt
     if (req.user.role !== "Creator") {
-      const transfer = await SupplyChainTransaction.findOne({
+      // If another pharmacy has a dedicated exclusive transfer lock for this batch, reject unauthorized third parties
+      const otherPharmacyTransfer = await SupplyChainTransaction.findOne({
         batchId: medicine.batchId,
         toRole: "Pharmacy",
-        $or: [
-          { toUserId: req.user._id },
-          ...(safePharmacyActor ? [{ to: new RegExp(`^${safePharmacyActor}$`, "i") }] : []),
-        ],
+        toUserId: { $exists: true, $ne: null },
       });
-      const isCurrentOwner = medicine.currentOwnerId && medicine.currentOwnerId.toString() === req.user._id.toString();
-      if (!transfer && !isCurrentOwner) {
-        return sendError(res, "Access denied: This medicine batch was not dispatched to your pharmacy.", "FORBIDDEN", 403);
+
+      if (otherPharmacyTransfer && otherPharmacyTransfer.toUserId && otherPharmacyTransfer.toUserId.toString() !== req.user._id.toString()) {
+        const isActorMatch = otherPharmacyTransfer.to && safePharmacyActor && otherPharmacyTransfer.to.toLowerCase() === pharmacyActor.toLowerCase();
+        if (!isActorMatch) {
+          return sendError(res, "Access denied: This medicine batch was dispatched to a different pharmacy.", "FORBIDDEN", 403);
+        }
       }
     }
 
@@ -3856,19 +3857,52 @@ router.post("/pharmacy/:medicineId/confirm", verifyToken, requireRole("Pharmacy"
     medicine.currentHolder = `Pharmacy Shelf (${pharmacyActor})`;
     await medicine.save();
 
-    // Update SupplyChainTransaction for this batch
-    await SupplyChainTransaction.updateMany(
-      { batchId: medicine.batchId, toRole: "Pharmacy" },
-      {
-        $set: {
-          toUserId: req.user._id,
-          to: pharmacyActor,
-          action: "RECEIVED",
-          status: "Stocked",
-          blockchainStatus: "Received",
-        },
+    // Update or create SupplyChainTransaction for this batch
+    const existingPharmTransfer = await SupplyChainTransaction.findOne({
+      batchId: medicine.batchId,
+      toRole: "Pharmacy",
+    });
+
+    if (existingPharmTransfer) {
+      existingPharmTransfer.toUserId = req.user._id;
+      existingPharmTransfer.to = pharmacyActor;
+      existingPharmTransfer.action = "RECEIVED";
+      existingPharmTransfer.status = "Stocked";
+      existingPharmTransfer.blockchainStatus = "Received";
+      existingPharmTransfer.confirmTxHash = chainRecord.txHash;
+      await existingPharmTransfer.save();
+    } else {
+      // Find latest transfer (e.g. from Distributor or Manufacturer) to link the custody chain
+      const latestTx = await SupplyChainTransaction.findOne({ batchId: medicine.batchId }).sort({ createdAt: -1 });
+      const pharmacyTransferId = `TR-${Date.now().toString().slice(-6)}`;
+      await SupplyChainTransaction.create({
+        id: pharmacyTransferId,
+        transferId: pharmacyTransferId,
+        medicineId: medicine.id,
+        medicineName: medicine.name,
+        batchId: medicine.batchId,
+        fromUserId: latestTx?.toUserId || latestTx?.fromUserId || medicine.manufacturerId,
+        fromRole: latestTx?.toRole || latestTx?.fromRole || "Distributor",
+        from: latestTx?.to || latestTx?.from || "Distributor",
+        toRole: "Pharmacy",
+        toUserId: req.user._id,
+        to: pharmacyActor,
+        quantity: latestTx?.quantity || `${medicine.quantity || 1} Units`,
+        timestamp: ts,
+        action: "RECEIVED",
+        status: "Stocked",
+        blockchainStatus: "Received",
+        confirmTxHash: chainRecord.txHash,
+      });
+
+      // Mark the prior transfer as confirmed/fulfilled
+      if (latestTx && latestTx.status === "Pending Confirmation") {
+        latestTx.status = "Confirmed";
+        latestTx.action = "CONFIRMED";
+        latestTx.blockchainStatus = "Confirmed";
+        await latestTx.save();
       }
-    );
+    }
 
     // Record BlockchainTransaction
     try {

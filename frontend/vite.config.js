@@ -10,13 +10,13 @@ export default defineConfig({
     proxy: {
       // Forward all /api/* requests to the Express backend
       '/api': {
-        target: 'http://localhost:5050',
+        target: 'http://127.0.0.1:5050',
         changeOrigin: true,
         secure: false,
       },
       // Forward /uploads/* (served by Express static)
       '/uploads': {
-        target: 'http://localhost:5050',
+        target: 'http://127.0.0.1:5050',
         changeOrigin: true,
         secure: false,
       },
